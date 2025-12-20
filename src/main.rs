@@ -7,6 +7,7 @@ use axum::{
 };
 use sysinfo::{System};
 use tokio::net::TcpListener;
+use tower_http::services::ServeDir;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -17,8 +18,6 @@ struct DashboardTemplate {
     memory_percentage: u32,
 }
 
-// Manually implement IntoResponse for our template
-// This replaces the old askama_axum functionality
 impl IntoResponse for DashboardTemplate {
     fn into_response(self) -> Response {
         match self.render() {
@@ -39,7 +38,7 @@ async fn dashboard_handler() -> impl IntoResponse {
     sys.refresh_all();
     
     // Important: CPU usage needs a small delay or a second refresh to be calculated
-    // For a real app, you'd probably maintain a global 'System' instance
+    // For a real app, maintain a global 'System' instance
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     sys.refresh_cpu_all();
     
@@ -66,12 +65,12 @@ async fn dashboard_handler() -> impl IntoResponse {
 
 #[tokio::main]
 async fn main() {
-    // Build application with Axum
-    let app = Router::new().route("/", get(dashboard_handler));
+    let app = Router::new()
+        .route("/", get(dashboard_handler))
+        // Serves files from the "static" directory at the "/static" URL path
+        .nest_service("/static", ServeDir::new("static"));
 
-    // Server setup
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Dashboard live at http://localhost:3000");
-    
+    println!("Server running on http://localhost:3000");
     axum::serve(listener, app).await.unwrap();
 }

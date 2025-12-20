@@ -8,112 +8,69 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: sans-serif; background: #f4f4f9; padding: 2rem; }
-        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
-        .bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; }
+        
+        /* Layout en grille */
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Deux colonnes égales */
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        /* On force le dashboard à se comporter comme s'il n'existait pas 
+           pour que ses enfants (cartes CPU/RAM) s'insèrent dans la grille parente */
+        #dashboard {
+            display: contents; 
+        }
+
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        /* Placement spécifique */
+        .cpu-card { grid-column: 1; grid-row: 1; }
+        .ram-card { grid-column: 2; grid-row: 1 / span 2; } /* La RAM prend toute la hauteur à droite */
+        .chart-card { grid-column: 1; grid-row: 2; } /* Le graphique est sous le CPU */
+
+        .bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; margin-top: 10px; }
         .bar { background: #4caf50; height: 100%; border-radius: 4px; transition: width 0.5s; }
-        canvas { max-height: 400px; }
+        
+        .chart-container { position: relative; height: 250px; width: 100%; }
+        h1 { margin-bottom: 2rem; }
     </style>
 </head>
 <body>
     <h1>Server Resources</h1>
     
-    <div id="dashboard">
-        <div class="card">
-            <h3>CPU Usage</h3>
-            <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
-            <div class="bar-container">
-                <div class="bar" style="width: {{ cpu_usage }}%"></div>
+    <div class="admin-grid">
+        <div id="dashboard">
+            <div class="card cpu-card">
+                <h3>CPU Usage</h3>
+                <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
+                <div class="bar-container">
+                    <div class="bar" style="width: {{ cpu_usage }}%"></div>
+                </div>
+            </div>
+
+            <div class="card ram-card">
+                <h3>Memory (RAM)</h3>
+                <p><strong>Used:</strong> {{ used_memory }} GB</p>
+                <p><strong>Total:</strong> {{ total_memory }} GB</p>
+                <div class="bar-container">
+                    <div class="bar" style="width: {{ memory_percentage }}%"></div>
+                </div>
+                <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
             </div>
         </div>
 
-        <div class="card">
-            <h3>Memory (RAM)</h3>
-            <p>{{ used_memory }} GB / {{ total_memory }} GB</p>
-            <div class="bar-container">
-                <div class="bar" style="width: {{ memory_percentage }}%"></div>
+        <div class="card chart-card">
+            <h3>CPU History (5 min)</h3>
+            <div class="chart-container">
+                <canvas id="cpuChart"></canvas>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <canvas id="cpuChart"></canvas>
-    </div>
+    <div hx-get="/" hx-trigger="every 1s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML"></div>
 
-    <div hx-get="/" hx-trigger="every 0.5s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML">
-    </div>
-
-    <script>
-        const MAX_POINTS = 600; // 10 minutes window (1200 * 0.5s)
-        const ctx = document.getElementById('cpuChart').getContext('2d');
-        
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'CPU Usage %',
-                    data: [],
-                    borderColor: '#4caf50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                    borderWidth: 2,
-                    fill: true,
-                    pointRadius: 0, // Performance: hide points
-                    tension: 0.2    // Slight smoothing
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false, // Essential for performance at 0.5s intervals
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
-                    },
-                    x: {
-                        ticks: {
-                            display: true,
-                            maxRotation: 0,
-                            autoSkip: true,
-                            maxTicksLimit: 10 // Only show ~10 time labels to keep it clean
-                        },
-                        grid: { display: false }
-                    }
-                },
-                plugins: {
-                    legend: { display: true }
-                }
-            }
-        });
-
-        function updateChart() {
-            const cpuElement = document.getElementById('cpu-value');
-            if (!cpuElement) return;
-
-            const val = parseFloat(cpuElement.innerText);
-            const time = new Date().toLocaleTimeString();
-
-            // Add new data point
-            chart.data.labels.push(time);
-            chart.data.datasets[0].data.push(val);
-
-            // Maintain the 5-minute sliding window (600 points)
-            if (chart.data.labels.length > MAX_POINTS) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-            }
-
-            // Update chart without animations for efficiency
-            chart.update('none');
-        }
-
-        // Handle HTMX updates
-        document.body.addEventListener('htmx:afterSwap', function(evt) {
-            if (evt.detail.target.id === 'dashboard') {
-                updateChart();
-            }
-        });
-    </script>
+    <script src="/static/dashboard.js"></script>
 </body>
 </html>
