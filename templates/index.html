@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Monitor</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 2rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+        .bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; }
+        .bar { background: #4caf50; height: 100%; border-radius: 4px; transition: width 0.5s; }
+        canvas { max-height: 400px; }
+    </style>
+</head>
+<body>
+    <h1>Server Resources</h1>
+    
+    <div id="dashboard">
+        <div class="card">
+            <h3>CPU Usage</h3>
+            <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
+            <div class="bar-container">
+                <div class="bar" style="width: {{ cpu_usage }}%"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Memory (RAM)</h3>
+            <p>{{ used_memory }} GB / {{ total_memory }} GB</p>
+            <div class="bar-container">
+                <div class="bar" style="width: {{ memory_percentage }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <canvas id="cpuChart"></canvas>
+    </div>
+
+    <div hx-get="/" hx-trigger="every 0.5s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML">
+    </div>
+
+    <script>
+        const MAX_POINTS = 600; // 10 minutes window (1200 * 0.5s)
+        const ctx = document.getElementById('cpuChart').getContext('2d');
+        
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CPU Usage %',
+                    data: [],
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    pointRadius: 0, // Performance: hide points
+                    tension: 0.2    // Slight smoothing
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, // Essential for performance at 0.5s intervals
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    x: {
+                        ticks: {
+                            display: true,
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 10 // Only show ~10 time labels to keep it clean
+                        },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: { display: true }
+                }
+            }
+        });
+
+        function updateChart() {
+            const cpuElement = document.getElementById('cpu-value');
+            if (!cpuElement) return;
+
+            const val = parseFloat(cpuElement.innerText);
+            const time = new Date().toLocaleTimeString();
+
+            // Add new data point
+            chart.data.labels.push(time);
+            chart.data.datasets[0].data.push(val);
+
+            // Maintain the 5-minute sliding window (600 points)
+            if (chart.data.labels.length > MAX_POINTS) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+
+            // Update chart without animations for efficiency
+            chart.update('none');
+        }
+
+        // Handle HTMX updates
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'dashboard') {
+                updateChart();
+            }
+        });
+    </script>
+</body>
+</html>
