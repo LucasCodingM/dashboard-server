@@ -1,4 +1,7 @@
+mod utils;
+
 use askama::Template;
+use std::sync::Mutex;
 use axum::{
     http::StatusCode,
     response::{Html, IntoResponse, Response},
@@ -8,14 +11,25 @@ use axum::{
 use sysinfo::{System};
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
+use lazy_static::lazy_static;
+
+use std::ffi::OsStr;
+
+lazy_static! {
+    /// This is an example for using doc comment attributes
+    static ref SYS: Mutex<System> = Mutex::new(System::new_all());
+}
 
 #[derive(Template)]
 #[template(path = "index.html")]
 struct DashboardTemplate {
     cpu_usage: u32,
-    total_memory: u64,
-    used_memory: u64,
+    total_memory: String,
+    used_memory: String,
     memory_percentage: u32,
+    bot_status: bool,
+    samba_status: bool,
+    minidlna_status: bool,
 }
 
 impl IntoResponse for DashboardTemplate {
@@ -31,23 +45,16 @@ impl IntoResponse for DashboardTemplate {
     }
 }
 
+
+
 async fn dashboard_handler() -> impl IntoResponse {
-    let mut sys = System::new_all();
-    
-    // Refresh system information to get latest stats
+    let mut sys = SYS.lock().unwrap();
     sys.refresh_all();
-    
-    // Important: CPU usage needs a small delay or a second refresh to be calculated
-    // For a real app, maintain a global 'System' instance
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-    sys.refresh_cpu_all();
     
     let cpu_usage = sys.global_cpu_usage() as u32;
     
-    // Convert bytes to GB
-    let bytes_to_gb = 1024 * 1024 * 1024;
-    let total_mem = sys.total_memory() / bytes_to_gb;
-    let used_mem = sys.used_memory() / bytes_to_gb;
+    let total_mem = utils::human_readable_bytes(sys.total_memory());
+    let used_mem = utils::human_readable_bytes(sys.used_memory());
     
     let mem_pct = if sys.total_memory() > 0 {
         ((sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0) as u32
@@ -55,11 +62,18 @@ async fn dashboard_handler() -> impl IntoResponse {
         0
     };
 
+    let bot_status = sys.processes_by_name(OsStr::new("declin_bot")).next().is_some();
+    let samba_status = sys.processes_by_name(OsStr::new("smbd")).next().is_some();
+    let minidlna_status = sys.processes_by_name(OsStr::new("minidlna")).next().is_some();
+
     DashboardTemplate {
         cpu_usage,
         total_memory: total_mem,
         used_memory: used_mem,
         memory_percentage: mem_pct,
+        bot_status,
+        samba_status,
+        minidlna_status,
     }
 }
 

@@ -27,8 +27,9 @@
         
         /* Placement spécifique */
         .cpu-card { grid-column: 1; grid-row: 1; }
-        .ram-card { grid-column: 2; grid-row: 1 / span 2; } /* La RAM prend toute la hauteur à droite */
+        .ram-card { grid-column: 2; grid-row: 1; }
         .chart-card { grid-column: 1; grid-row: 2; } /* Le graphique est sous le CPU */
+        .services-card { grid-column: 2; grid-row: 2; }
 
         .bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; margin-top: 10px; }
         .bar { background: #4caf50; height: 100%; border-radius: 4px; transition: width 0.5s; }
@@ -52,12 +53,19 @@
 
             <div class="card ram-card">
                 <h3>Memory (RAM)</h3>
-                <p><strong>Used:</strong> {{ used_memory }} GB</p>
-                <p><strong>Total:</strong> {{ total_memory }} GB</p>
+                <p><strong>Used:</strong> {{ used_memory }}</p>
+                <p><strong>Total:</strong> {{ total_memory }}</p>
                 <div class="bar-container">
                     <div class="bar" style="width: {{ memory_percentage }}%"></div>
                 </div>
                 <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
+            </div>
+
+            <div class="card services-card">
+                <h3>Services Status</h3>
+                <p>Bot Status: {% if bot_status %}🟢 Running{% else %}🔴 Stopped{% endif %}</p>
+                <p>Samba: {% if samba_status %}🟢 Running{% else %}🔴 Stopped{% endif %}</p>
+                <p>MiniDLNA: {% if minidlna_status %}🟢 Running{% else %}🔴 Stopped{% endif %}</p>
             </div>
         </div>
 
