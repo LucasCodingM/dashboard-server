@@ -6,79 +6,154 @@
     <title>Server Monitor</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: sans-serif; background: #f4f4f9; padding: 2rem; }
-        
-        /* Layout en grille */
-        .admin-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr; /* Deux colonnes égales */
-            gap: 1.5rem;
-            align-items: start;
-        }
-
-        /* On force le dashboard à se comporter comme s'il n'existait pas 
-           pour que ses enfants (cartes CPU/RAM) s'insèrent dans la grille parente */
-        #dashboard {
-            display: contents; 
-        }
-
-        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        
-        /* Placement spécifique */
-        .cpu-card { grid-column: 1; grid-row: 1; }
-        .ram-card { grid-column: 2; grid-row: 1; }
-        .chart-card { grid-column: 1; grid-row: 2; } /* Le graphique est sous le CPU */
-        .services-card { grid-column: 2; grid-row: 2; }
-
-        .bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; margin-top: 10px; }
-        .bar { background: #4caf50; height: 100%; border-radius: 4px; transition: width 0.5s; }
-        
-        .chart-container { position: relative; height: 250px; width: 100%; }
-        h1 { margin-bottom: 2rem; }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <div class="top-right-auth">
+        {% if is_authenticated %}
+            <!-- Si authentifié : Bouton d'extinction et Déconnexion -->
+            <form action="/shutdown" method="post" onsubmit="return confirm('Êtes-vous sûr de vouloir éteindre le serveur ?');">
+                <button type="submit" class="btn-shutdown">🛑 Éteindre le serveur</button>
+            </form>
+            
+            <form action="/reboot" method="post" onsubmit="return confirm('Êtes-vous sûr de vouloir redémarrer le serveur ?');">
+                <button type="submit" class="btn-reboot">🔄 Redémarrer</button>
+            </form>
+            
+            <form action="/logout" method="post">
+                <button type="submit" class="btn-logout">Déconnexion</button>
+            </form>
+        {% else %}
+            <!-- Sinon : Formulaire de connexion -->
+            <form action="/login" method="post" class="login-form" style="flex-direction: row;">
+                <input type="password" name="password" placeholder="Mot de passe" required style="padding: 5px;">
+                <button type="submit" class="btn-login">Connexion</button>
+            </form>
+        {% endif %}
+    </div>
     <h1>Server Resources</h1>
     
-    <div class="admin-grid">
-        <div id="dashboard">
-            <div class="card cpu-card">
-                <h3>CPU Usage</h3>
-                <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
-                <div class="bar-container">
-                    <div class="bar" style="width: {{ cpu_usage }}%"></div>
+    <div class="tabs">
+        <button class="tab-link active" onclick="openTab(event, 'dashboard-tab')">Dashboard</button>
+        <button class="tab-link" onclick="openTab(event, 'downloader-tab')">Téléchargements</button>
+    </div>
+
+    <div id="dashboard-tab" class="tab-content" style="display: block;">
+        <div class="admin-grid">
+            <div id="dashboard">
+                <div class="card cpu-card">
+                    <h3>CPU Usage</h3>
+                    <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
+                    <div class="bar-container">
+                        <div class="bar" style="width: {{ cpu_usage }}%"></div>
+                    </div>
+                </div>
+
+                <div class="card ram-card">
+                    <h3>Memory (RAM)</h3>
+                    <p><strong>Used:</strong> {{ used_memory }}</p>
+                    <p><strong>Total:</strong> {{ total_memory }}</p>
+                    <div class="bar-container">
+                        <div class="bar" style="width: {{ memory_percentage }}%"></div>
+                    </div>
+                    <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
+                </div>
+
+                <div class="card services-card">
+                    <h3>Services Status</h3>
+                    <div class="service-row">
+                        <span>Bot ({% if bot_status %}Running{% else %}Stopped{% endif %})</span>
+                        {% if is_authenticated %}
+                            <label class="switch">
+                                <input type="checkbox" {% if bot_status %}checked{% endif %} 
+                                    hx-post="/service/bot/{% if bot_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                <span class="slider"></span>
+                            </label>
+                        {% else %}
+                            <div class="led {% if bot_status %}led-green{% else %}led-red{% endif %}"></div>
+                        {% endif %}
+                    </div>
+                    <div class="service-row">
+                        <span>Samba ({% if samba_status %}Running{% else %}Stopped{% endif %})</span>
+                        {% if is_authenticated %}
+                            <label class="switch">
+                                <input type="checkbox" {% if samba_status %}checked{% endif %} 
+                                    hx-post="/service/samba/{% if samba_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                <span class="slider"></span>
+                            </label>
+                        {% else %}
+                            <div class="led {% if samba_status %}led-green{% else %}led-red{% endif %}"></div>
+                        {% endif %}
+                    </div>
+                    <div class="service-row">
+                        <span>MiniDLNA ({% if minidlna_status %}Running{% else %}Stopped{% endif %})</span>
+                        {% if is_authenticated %}
+                            <label class="switch">
+                                <input type="checkbox" {% if minidlna_status %}checked{% endif %} 
+                                    hx-post="/service/minidlna/{% if minidlna_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                <span class="slider"></span>
+                            </label>
+                        {% else %}
+                            <div class="led {% if minidlna_status %}led-green{% else %}led-red{% endif %}"></div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 
-            <div class="card ram-card">
-                <h3>Memory (RAM)</h3>
-                <p><strong>Used:</strong> {{ used_memory }}</p>
-                <p><strong>Total:</strong> {{ total_memory }}</p>
-                <div class="bar-container">
-                    <div class="bar" style="width: {{ memory_percentage }}%"></div>
+            <div class="card chart-card">
+                <h3>CPU History (5 min)</h3>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
                 </div>
-                <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
-            </div>
-
-            <div class="card services-card">
-                <h3>Services Status</h3>
-                <p>Bot Status: {% if bot_status %}🟢 Running{% else %}🔴 Stopped{% endif %}</p>
-                <p>Samba: {% if samba_status %}🟢 Running{% else %}🔴 Stopped{% endif %}</p>
-                <p>MiniDLNA: {% if minidlna_status %}🟢 Running{% else %}🔴 Stopped{% endif %}</p>
             </div>
         </div>
+    </div>
 
-        <div class="card chart-card">
-            <h3>CPU History (5 min)</h3>
-            <div class="chart-container">
-                <canvas id="cpuChart"></canvas>
-            </div>
+    <div id="downloader-tab" class="tab-content">
+        <div class="downloader-form">
+            <h2>Téléchargement</h2>
+            {% if is_authenticated %}
+            <form hx-post="/download" hx-swap="innerHTML" hx-target="#download-response">
+                <div style="margin-bottom: 1rem;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">URL (Fichier ou YouTube)</label>
+                    <input type="text" name="url" placeholder="https://..." required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Type de contenu</label>
+                    <select name="category" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="video">Vidéo (/stockage/videos)</option>
+                        <option value="film">Film (/stockage/videos/films)</option>
+                        <option value="other">Autre (/stockage/telechargements)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Télécharger</button>
+            </form>
+            <div id="download-response" style="margin-top: 1rem; font-weight: bold; color: #4caf50;"></div>
+            {% else %}
+            <p>Veuillez vous connecter pour accéder aux téléchargements.</p>
+            {% endif %}
         </div>
     </div>
 
     <div hx-get="/" hx-trigger="every 1s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML"></div>
 
     <script src="/static/dashboard.js"></script>
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            tablinks = document.getElementsByClassName("tab-link");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+    </script>
 </body>
 </html>

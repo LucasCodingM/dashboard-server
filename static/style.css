@@ -1,0 +1,180 @@
+body { font-family: sans-serif; background: #f4f4f9; padding: 2rem; }
+
+/* Layout en grille */
+.admin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Deux colonnes égales */
+    gap: 1.5rem;
+    align-items: start;
+}
+
+/* On force le dashboard à se comporter comme s'il n'existait pas 
+   pour que ses enfants (cartes CPU/RAM) s'insèrent dans la grille parente */
+#dashboard {
+    display: contents; 
+}
+
+.card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+/* Placement spécifique */
+.cpu-card { grid-column: 1; grid-row: 1; }
+.ram-card { grid-column: 2; grid-row: 1; }
+.chart-card { grid-column: 1; grid-row: 2; } /* Le graphique est sous le CPU */
+.services-card { grid-column: 2; grid-row: 2; }
+
+.bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; margin-top: 10px; }
+.bar { background: #4caf50; height: 100%; border-radius: 4px; transition: width 0.5s; }
+
+.chart-container { position: relative; height: 250px; width: 100%; }
+h1 { margin-bottom: 2rem; }
+
+/* Switch CSS */
+.service-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+.slider:before {
+    position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+    background-color: white; transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: #4caf50; }
+input:checked + .slider:before { transform: translateX(20px); }
+
+/* Login Styles */
+.modal { border: none; border-radius: 8px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.modal::backdrop { background: rgba(0,0,0,0.5); }
+.login-form { display: flex; flex-direction: column; gap: 1rem; min-width: 250px; }
+.login-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+.btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+.btn-primary { background: #2196F3; color: white; }
+.btn-danger { background: #f44336; color: white; }
+.btn-success { background: #4caf50; color: white; }
+.btn-secondary { background: #ccc; color: #333; }
+
+/* Positionnement en haut à droite */
+.top-right-auth {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    z-index: 1000; /* S'assure qu'il est au-dessus du reste */
+}
+
+/* Styles des boutons */
+.btn-shutdown {
+    background-color: #dc3545; /* Rouge */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-reboot {
+    background-color: #ff9800; /* Orange */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-login {
+    background-color: #007bff; /* Bleu */
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-logout {
+    cursor: pointer;
+    padding: 5px 10px;
+}
+
+/* Mise en page du formulaire de connexion */
+.login-form {
+    display: flex;
+    gap: 5px;
+}
+
+/* LED Indicators */
+.led {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.led-green {
+    background-color: #4caf50;
+    box-shadow: 0 0 6px #4caf50;
+}
+
+.led-red {
+    background-color: #f44336;
+    box-shadow: 0 0 6px #f44336;
+}
+
+/* Tabs Navigation */
+.tabs {
+    display: flex;
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-link {
+    padding: 10px 20px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    color: #666;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+
+.tab-link:hover {
+    color: #333;
+    background-color: #f8f8f8;
+}
+
+.tab-link.active {
+    color: #2196F3;
+    border-bottom: 2px solid #2196F3;
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Downloader Form */
+.downloader-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    max-width: 600px;
+}
