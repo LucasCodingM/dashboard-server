@@ -14,6 +14,8 @@ use crate::handlers::{dashboard_handler, service_handler, login_handler, logout_
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+
     let app = Router::new()
         .route("/", get(dashboard_handler))
         .route("/service/{name}/{action}", post(service_handler))

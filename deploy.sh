@@ -10,7 +10,7 @@ cargo build --release
 
 echo "--- Sending files to server ---"
 # We send the binary, templates, and static folder
-rsync -avz --delete target/release/$BINARY_NAME templates static $SERVER:$DEST
+rsync -avz --delete target/release/$BINARY_NAME templates static .env $SERVER:$DEST
 
 echo "--- Restarting the service ---"
 ssh $SERVER "sudo systemctl restart dashboard"

@@ -76,8 +76,12 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
 }
 
 pub async fn login_handler(Form(payload): Form<LoginRequest>) -> impl IntoResponse {
-    // REMPLACEZ "admin" PAR VOTRE MOT DE PASSE SOUHAITÉ
-    if payload.password == "admin" {
+    let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
+        eprintln!("ADMIN_PASSWORD n'est pas défini dans le fichier .env");
+        String::new()
+    });
+
+    if !admin_password.is_empty() && payload.password == admin_password {
         let mut headers = HeaderMap::new();
         // On définit un cookie simple. Dans une vraie prod, utilisez des cookies signés/sécurisés.
         headers.insert(header::SET_COOKIE, "auth_session=true; Path=/; HttpOnly; SameSite=Lax".parse().unwrap());
