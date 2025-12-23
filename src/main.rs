@@ -10,22 +10,23 @@ use axum::{
 };
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
-use crate::handlers::{dashboard_handler, service_handler, login_handler, logout_handler, shutdown_handler, reboot_handler, download_handler, stop_download_handler, get_download_logs};
+use crate::handlers::{authentification, download, system};
+
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
 
     let app = Router::new()
-        .route("/", get(dashboard_handler))
-        .route("/service/{name}/{action}", post(service_handler))
-        .route("/login", post(login_handler))
-        .route("/logout", post(logout_handler))
-        .route("/shutdown", post(shutdown_handler))
-        .route("/reboot", post(reboot_handler))
-        .route("/download", post(download_handler))
-        .route("/download/stop", post(stop_download_handler))
-        .route("/download/logs", get(get_download_logs))
+        .route("/", get(system::dashboard_handler))
+        .route("/service/{name}/{action}", post(system::service_handler))
+        .route("/login", post(authentification::login_handler))
+        .route("/logout", post(authentification::logout_handler))
+        .route("/shutdown", post(system::shutdown_handler))
+        .route("/reboot", post(system::reboot_handler))
+        .route("/download", post(download::download_handler))
+        .route("/download/stop", post(download::stop_download_handler))
+        .route("/download/logs", get(download::get_download_logs))
         // Serves files from the "static" directory at the "/static" URL path
         .nest_service("/static", ServeDir::new("static"));
 
