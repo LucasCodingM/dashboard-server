@@ -146,19 +146,23 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
         }
     }
 
-    let root_path = "/stockage";
+    let movie_path = std::env::var("MOVIE_PATH").unwrap_or_else(|_| {
+        eprintln!("MOVIE_PATH n'est pas défini dans le fichier .env");
+        "/stockage/videos/films".to_string()
+    });
+    let video_path: String = std::env::var("VIDEO_PATH").unwrap_or_else(|_| {
+        eprintln!("VIDEO_PATH n'est pas défini dans le fichier .env");
+        "/stockage/videos".to_string()
+    });
+    let download_path = std::env::var("DOWNLOAD_PATH").unwrap_or_else(|_| {
+        eprintln!("DOWNLOAD_PATH n'est pas défini dans le fichier .env");
+        "/stockage/telechargements".to_string()
+    });
     let target_dir = match payload.category.as_str() {
-        "film" => format!("{}/videos/films", root_path),
-        "video" => format!("{}/videos", root_path),
-        _ => format!("{}/telechargements", root_path),
+        "film" => movie_path,
+        "video" => video_path,
+        _ => download_path,
     };
-
-/*     let root_path = "/home/lucas";
-    let target_dir = match payload.category.as_str() {
-        "film" => format!("{}/Vidéos", root_path),
-        "video" => format!("{}/Vidéos", root_path),
-        _ => format!("{}/Téléchargements", root_path),
-    }; */
 
     let is_youtube = payload.url.contains("youtube.com") || payload.url.contains("youtu.be");
 
@@ -169,12 +173,14 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
         state.logs.clear();
         state.logs.push(format!("Démarrage du téléchargement : {}", payload.url));
         state.child_pid = None;
+        state.target_dir = Some(target_dir.clone());
     }
 
     std::thread::spawn(move || {
         let mut cmd = if is_youtube {
             let mut c = Command::new("yt-dlp");
             c.arg("--newline");
+            c.arg("--no-colors");
             c.arg("-o");
             c.arg(format!("{}/%(title)s.%(ext)s", target_dir));
             c.arg(&payload.url);
@@ -254,9 +260,25 @@ pub async fn stop_download_handler(headers: HeaderMap) -> impl IntoResponse {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
     
-    let state = DOWNLOAD_STATE.lock().unwrap();
+    let mut state = DOWNLOAD_STATE.lock().unwrap();
     if let Some(pid) = state.child_pid {
         let _ = Command::new("kill").arg(pid.to_string()).output();
+
+        // Nettoyage simple des fichiers temporaires (.part, .ytdl) dans le dossier cible
+        if let Some(target_dir) = &state.target_dir {
+            if let Ok(entries) = std::fs::read_dir(target_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if let Some(ext) = path.extension() {
+                        if ext == "part" || ext == "ytdl" {
+                            if let Ok(_) = std::fs::remove_file(&path) {
+                                state.logs.push(format!("Fichier résiduel supprimé : {:?}", path.file_name().unwrap()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     "Arrêt demandé...".into_response()

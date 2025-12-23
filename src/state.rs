@@ -6,6 +6,7 @@ pub struct DownloadState {
     pub is_running: bool,
     pub logs: Vec<String>,
     pub child_pid: Option<u32>,
+    pub target_dir: Option<String>,
 }
 
 lazy_static! {
@@ -14,5 +15,6 @@ lazy_static! {
         is_running: false,
         logs: Vec::new(),
         child_pid: None,
+        target_dir: None,
     });
 }
