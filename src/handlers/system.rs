@@ -5,9 +5,11 @@ use axum::{
 };
 use std::ffi::OsStr;
 use std::process::Command;
+use sysinfo::{System, Components, Disks};
+use std::collections::{HashMap, HashSet};
 use crate::utils;
-use crate::state::SYS;
-use crate::templates::DashboardTemplate;
+use crate::state::{SYS, COMPONENTS, DISKS};
+use crate::templates::{DashboardTemplate, DiskInfo};
 use crate::auth::check_auth;
 
 
@@ -46,9 +48,60 @@ pub async fn reboot_handler(headers: HeaderMap) -> impl IntoResponse {
 pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let mut sys = SYS.lock().unwrap();
     sys.refresh_all();
+
+    let mut components = COMPONENTS.lock().unwrap();
+    components.refresh(true);
+
+    let mut disks = DISKS.lock().unwrap();
+    disks.refresh(true);
     
-    let cpu_usage = sys.global_cpu_usage() as u32;
+    let (cpu_usage, cpu_model, cpu_temp, cpu_temp_val) = get_cpu_info(&sys, &components);
+    let (total_memory, used_memory, memory_percentage) = get_memory_info(&sys);
+    let disks_info = get_disks_info(&disks);
+    let (bot_status, samba_status, minidlna_status) = get_services_status(&sys);
+
+    let is_authenticated = check_auth(&headers);
+
+    DashboardTemplate {
+        cpu_usage,
+        cpu_model,
+        cpu_temp,
+        cpu_temp_val,
+        total_memory,
+        used_memory,
+        memory_percentage,
+        disks: disks_info,
+        bot_status,
+        samba_status,
+        minidlna_status,
+        is_authenticated,
+    }
+}
+
+fn get_cpu_info(sys: &System, components: &Components) -> (u32, String, String, f32) {
+    let usage = sys.global_cpu_usage() as u32;
     
+    let model = sys.cpus().first()
+        .map(|cpu| cpu.brand().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    let mut temp_val = 0.0;
+    for component in components.iter() {
+        let label = component.label().to_lowercase();
+        if label.contains("cpu") || label.contains("core") || label.contains("package") || label.contains("tctl") {
+            if let Some(t) = component.temperature(){ // sysinfo retourne f32
+            if t > temp_val {
+                temp_val = t;
+            }
+        }
+        }
+    }
+    let temp = format!("{:.0}°C", temp_val);
+
+    (usage, model, temp, temp_val)
+}
+
+fn get_memory_info(sys: &System) -> (String, String, u32) {
     let total_mem = utils::human_readable_bytes(sys.total_memory());
     let used_mem = utils::human_readable_bytes(sys.used_memory());
     
@@ -57,23 +110,104 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     } else {
         0
     };
+    
+    (total_mem, used_mem, mem_pct)
+}
 
+fn get_disks_info(disks: &Disks) -> Vec<DiskInfo> {
+    let mut disk_map: HashMap<String, (u64, u64)> = HashMap::new();
+    let mut processed_partitions: HashSet<String> = HashSet::new();
+
+    for disk in disks {
+        let name = disk.name().to_string_lossy();
+
+        // Éviter de compter deux fois la même partition si elle est montée à plusieurs endroits
+        if processed_partitions.contains(name.as_ref()) {
+            continue;
+        }
+
+        // Filtrer les périphériques virtuels (loop, ram, cd-rom)
+        if name.starts_with("loop") || name.starts_with("ram") || name.starts_with("sr") {
+            continue;
+        }
+
+        // Filtrer les systèmes de fichiers virtuels
+        let fs = disk.file_system().to_string_lossy();
+        if fs == "squashfs" || fs == "tmpfs" || fs == "overlay" || fs == "devtmpfs" {
+            continue;
+        }
+
+        processed_partitions.insert(name.to_string());
+
+        if fs == "zfs" {
+            let pool_name = name.split('/').next().unwrap_or(&name).to_string();
+            let total = disk.total_space();
+            let available = disk.available_space();
+            let used = total.saturating_sub(available); // Espace consommé par ce dataset précis
+
+            let used_for_display = std::cmp::min(used, total);
+
+            let entry = disk_map.entry(pool_name).or_insert((0, 0));
+            
+            // 1. L'espace TOTAL du pool est le MAX rapporté (hors quotas)
+            // On prend le max car les datasets avec quotas afficheront une taille inférieure.
+            entry.0 = std::cmp::max(entry.0, total);
+            
+            // 2. L'espace UTILISÉ est la SOMME de tous les datasets du pool
+            entry.1 += used_for_display; 
+            
+            continue;
+        }
+
+        // Regrouper par nom de disque physique (ex: sda1 -> sda, nvme0n1p1 -> nvme0n1)
+        let mut base_name = name.to_string();
+        if base_name.starts_with("nvme") || base_name.starts_with("mmcblk") {
+             if let Some(idx) = base_name.rfind('p') {
+                 if base_name[idx+1..].chars().all(|c| c.is_ascii_digit()) {
+                     base_name = base_name[..idx].to_string();
+                 }
+             }
+        } else {
+            let trimmed = base_name.trim_end_matches(|c: char| c.is_ascii_digit());
+            if !trimmed.is_empty() {
+                base_name = trimmed.to_string();
+            }
+        }
+
+        let total = disk.total_space();
+        let available = disk.available_space();
+        let used = total - available;
+
+        let entry = disk_map.entry(base_name).or_insert((0, 0));
+        entry.0 += total;
+        entry.1 += used;
+    }
+
+    let mut result: Vec<DiskInfo> = disk_map.into_iter().map(|(name, (total, used))| {
+        let percentage = if total > 0 {
+            ((used as f64 / total as f64) * 100.0) as u32
+        } else {
+            0
+        };
+        
+        DiskInfo {
+            name,
+            total: utils::human_readable_bytes(total),
+            used: utils::human_readable_bytes(used),
+            percentage,
+        }
+    }).collect();
+
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result
+}
+
+fn get_services_status(sys: &System) -> (bool, bool, bool) {
     let bot_status = sys.processes_by_name(OsStr::new("declin_bot")).next().is_some();
     let samba_status = sys.processes_by_name(OsStr::new("smbd")).next().is_some();
     let minidlna_status = sys.processes_by_name(OsStr::new("minidlna")).next().is_some();
-
-    let is_authenticated = check_auth(&headers);
-
-    DashboardTemplate {
-        cpu_usage,
-        total_memory: total_mem,
-        used_memory: used_mem,
-        memory_percentage: mem_pct,
-        bot_status,
-        samba_status,
-        minidlna_status,
-        is_authenticated,
-    }
+    
+    (bot_status, samba_status, minidlna_status)
 }
 
 pub async fn service_handler(Path((service, action)): Path<(String, String)>, headers: HeaderMap) -> impl IntoResponse {
@@ -104,6 +238,3 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
         _ => (StatusCode::INTERNAL_SERVER_ERROR, "Command failed").into_response(),
     }
 }
-
-
-

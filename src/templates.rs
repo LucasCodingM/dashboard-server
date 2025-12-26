@@ -8,13 +8,24 @@ use axum::{
 #[template(path = "index.html")]
 pub struct DashboardTemplate {
     pub cpu_usage: u32,
+    pub cpu_model: String,
+    pub cpu_temp: String,
+    pub cpu_temp_val: f32,
     pub total_memory: String,
     pub used_memory: String,
     pub memory_percentage: u32,
+    pub disks: Vec<DiskInfo>,
     pub bot_status: bool,
     pub samba_status: bool,
     pub minidlna_status: bool,
     pub is_authenticated: bool,
+}
+
+pub struct DiskInfo {
+    pub name: String,
+    pub total: String,
+    pub used: String,
+    pub percentage: u32,
 }
 
 impl IntoResponse for DashboardTemplate {

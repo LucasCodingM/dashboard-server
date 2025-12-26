@@ -6,46 +6,53 @@
     <title>Server Monitor</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=1.0.0">
 </head>
 <body>
     <div class="top-right-auth">
         {% if is_authenticated %}
             <!-- Si authentifié : Bouton d'extinction et Déconnexion -->
-            <form action="/shutdown" method="post" onsubmit="return confirm('Êtes-vous sûr de vouloir éteindre le serveur ?');">
-                <button type="submit" class="btn-shutdown">🛑 Éteindre le serveur</button>
+            <form action="/shutdown" method="post" onsubmit="return confirm('Are you sure you want to shutdown the server ?');">
+                <button type="submit" class="btn-shutdown">Shutdown</button>
             </form>
             
-            <form action="/reboot" method="post" onsubmit="return confirm('Êtes-vous sûr de vouloir redémarrer le serveur ?');">
-                <button type="submit" class="btn-reboot">🔄 Redémarrer</button>
+            <form action="/reboot" method="post" onsubmit="return confirm('Are you sure you want to reboot the server ?');">
+                <button type="submit" class="btn-reboot">Restart</button>
             </form>
             
             <form action="/logout" method="post">
-                <button type="submit" class="btn-logout">Déconnexion</button>
+                <button type="submit" class="btn-logout">Logout</button>
             </form>
         {% else %}
             <!-- Sinon : Formulaire de connexion -->
             <form action="/login" method="post" class="login-form" style="flex-direction: row;">
                 <input type="password" name="password" placeholder="Mot de passe" required style="padding: 5px;">
-                <button type="submit" class="btn-login">Connexion</button>
+                <button type="submit" class="btn-login">Login</button>
             </form>
         {% endif %}
     </div>
-    <h1>Server Resources</h1>
+    <h1>Server Lucas</h1>
     
     <div class="tabs">
         <button class="tab-link active" onclick="openTab(event, 'dashboard-tab')">Dashboard</button>
-        <button class="tab-link" onclick="openTab(event, 'downloader-tab')">Téléchargements</button>
+        <button class="tab-link" onclick="openTab(event, 'downloader-tab')">Downloader</button>
     </div>
 
     <div id="dashboard-tab" class="tab-content" style="display: block;">
         <div class="admin-grid">
             <div id="dashboard">
                 <div class="card cpu-card">
-                    <h3>CPU Usage</h3>
-                    <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
+                    <h3>CPU</h3>
+                    <p style="font-size: 0.85em; color: #666; margin-bottom: 5px;">{{ cpu_model }}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
+                        <p style="font-weight: bold; color: {% if cpu_temp_val < 33.333 %}#4caf50{% else if cpu_temp_val < 100.0 %}#ff9800{% else %}#d32f2f{% endif %};">🌡️ {{ cpu_temp }}</p>
+                    </div>
                     <div class="bar-container">
                         <div class="bar" style="width: {{ cpu_usage }}%"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="cpuChart" hx-preserve></canvas>
                     </div>
                 </div>
 
@@ -59,8 +66,23 @@
                     <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
                 </div>
 
+                <div class="card disks-card">
+                    <h3>Storage</h3>
+                    {% for disk in disks %}
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-weight: bold; font-size: 0.9em;">{{ disk.name }}</span>
+                            <span style="font-size: 0.8em; color: #666;">{{ disk.used }} / {{ disk.total }}</span>
+                        </div>
+                        <div class="bar-container">
+                            <div class="bar" style="width: {{ disk.percentage }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
                 <div class="card services-card">
-                    <h3>Services Status</h3>
+                    <h3>Services</h3>
                     <div class="service-row">
                         <span>Bot ({% if bot_status %}Running{% else %}Stopped{% endif %})</span>
                         {% if is_authenticated %}
@@ -99,19 +121,12 @@
                     </div>
                 </div>
             </div>
-
-            <div class="card chart-card">
-                <h3>CPU History (5 min)</h3>
-                <div class="chart-container">
-                    <canvas id="cpuChart"></canvas>
-                </div>
-            </div>
         </div>
     </div>
 
     <div id="downloader-tab" class="tab-content">
         <div class="downloader-form">
-            <h2>Téléchargement</h2>
+            <h2>Download helper</h2>
             {% if is_authenticated %}
             <form hx-post="/download" hx-swap="innerHTML" hx-target="#download-response">
                 <div style="margin-bottom: 1rem;">
@@ -128,18 +143,18 @@
                     </select>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Télécharger</button>
+                <button type="submit" class="btn btn-primary">Download</button>
             </form>
             <div id="download-response" style="margin-top: 1rem; font-weight: bold; color: #4caf50;"></div>
             {% else %}
-            <p>Veuillez vous connecter pour accéder aux téléchargements.</p>
+            <p>Please login to access download.</p>
             {% endif %}
         </div>
     </div>
 
     <div hx-get="/" hx-trigger="every 1s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML"></div>
 
-    <script src="/static/dashboard.js"></script>
+    <script src="/static/dashboard.js?v=3"></script>
     <script>
         function openTab(evt, tabName) {
             var i, tabcontent, tablinks;

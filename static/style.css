@@ -23,7 +23,7 @@ body { font-family: sans-serif; background: #f4f4f9; padding: 2rem; }
 .services-card { grid-column: 2; grid-row: 2; }
 
 .bar-container { background: #eee; border-radius: 4px; height: 20px; width: 100%; margin-top: 10px; }
-.bar { background: #4caf50; height: 100%; border-radius: 4px; transition: width 0.5s; }
+.bar { background: #2196F3; height: 100%; border-radius: 4px; transition: width 0.5s; }
 
 .chart-container { position: relative; height: 250px; width: 100%; }
 h1 { margin-bottom: 2rem; }
@@ -49,7 +49,7 @@ h1 { margin-bottom: 2rem; }
     position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
     background-color: white; transition: .4s; border-radius: 50%;
 }
-input:checked + .slider { background-color: #4caf50; }
+input:checked + .slider { background-color: #2196F3; }
 input:checked + .slider:before { transform: translateX(20px); }
 
 /* Login Styles */

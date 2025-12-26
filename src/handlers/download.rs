@@ -21,11 +21,10 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
 
-        // Vérifier si un téléchargement est déjà en cours
     {
         let state = DOWNLOAD_STATE.lock().unwrap();
         if state.is_running {
-            return Html("<div style='color: red;'>Un téléchargement est déjà en cours.</div>").into_response();
+            return Html("<div style='color: red;'>Download already in progress.</div>").into_response();
         }
     }
 
@@ -54,7 +53,7 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
         let mut state = DOWNLOAD_STATE.lock().unwrap();
         state.is_running = true;
         state.logs.clear();
-        state.logs.push(format!("Démarrage du téléchargement : {}", payload.url));
+        state.logs.push(format!("Download starting : {}", payload.url));
         state.child_pid = None;
         state.target_dir = Some(target_dir.clone());
     }
@@ -175,7 +174,7 @@ pub async fn get_download_logs() -> impl IntoResponse {
         .join("<br>");
     
     let stop_button = if state.is_running {
-        r#"<button hx-post="/download/stop" class="btn-shutdown" style="margin-top: 10px; background-color: #d9534f;">Arrêter le téléchargement</button>"#
+        r#"<button hx-post="/download/stop" class="btn-shutdown" style="margin-top: 10px; background-color: #d9534f;">Stop download</button>"#
     } else {
         ""
     };
