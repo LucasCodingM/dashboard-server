@@ -66,6 +66,13 @@
                     <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
                 </div>
 
+                <div class="card power-card">
+                    <h3>Power Consumption</h3>
+                    <div style="text-align: center; padding: 15px 0;">
+                        <span style="font-size: 2em; font-weight: bold; color: #f57c00;">⚡ {{ server_power }}</span>
+                    </div>
+                </div>
+
                 <div class="card disks-card">
                     <h3>Storage</h3>
                     {% for disk in disks %}

@@ -10,12 +10,50 @@ use axum::{
 };
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
-use crate::handlers::{authentification, download, system};
+use crate::{handlers::{authentification, download, system}, state::POWER_CONSUMPTION};
 
+
+fn monitor_consumption() {
+    // Thread de monitoring de la consommation électrique (RAPL)
+    std::thread::spawn(|| {
+        let path = "/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj";
+        loop {
+            match std::fs::read_to_string(path) {
+                Ok(content1) => {
+                    if let Ok(e1) = content1.trim().parse::<u64>() {
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        if let Ok(content2) = std::fs::read_to_string(path) {
+                            if let Ok(e2) = content2.trim().parse::<u64>() {
+                                // Gestion du wrap-around du compteur (u64)
+                                let diff = if e2 >= e1 { e2 - e1 } else { (u64::MAX - e1) + e2 };
+                                let pkg_watts = diff as f32 / 1_000_000.0;
+                                
+                                // Formule: Ptotale = (Ppowerstat + Cfixes) * Kalim
+                                // Cfixes = 20W (Disques + CM/RAM/Fans), Kalim = 1.12 (PSU 80+ Gold)
+                                let total_watts = (pkg_watts + 20.0) * 1.12;
+                                *POWER_CONSUMPTION.lock().unwrap() = total_watts;
+                            }
+                        }
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Erreur lecture RAPL: {}", e);
+                    if e.kind() == std::io::ErrorKind::PermissionDenied {
+                        eprintln!("Tips: Run the program with sudo privileges. {}", path);
+                    }
+                    // Si le fichier n'existe pas (ex: pas de support RAPL), on attend avant de réessayer
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                }
+            }
+        }
+    });
+}
 
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().ok();
+
+    monitor_consumption();
 
     let app = Router::new()
         .route("/", get(system::dashboard_handler))

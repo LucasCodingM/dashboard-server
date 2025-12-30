@@ -8,7 +8,7 @@ use std::process::Command;
 use sysinfo::{System, Components, Disks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
-use crate::state::{SYS, COMPONENTS, DISKS};
+use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION};
 use crate::templates::{DashboardTemplate, DiskInfo};
 use crate::auth::check_auth;
 
@@ -60,6 +60,9 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let disks_info = get_disks_info(&disks);
     let (bot_status, samba_status, minidlna_status) = get_services_status(&sys);
 
+    let power_val = *POWER_CONSUMPTION.lock().unwrap();
+    let server_power = format!("{:.2} W", power_val);
+
     let is_authenticated = check_auth(&headers);
 
     DashboardTemplate {
@@ -75,6 +78,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         samba_status,
         minidlna_status,
         is_authenticated,
+        server_power,
     }
 }
 

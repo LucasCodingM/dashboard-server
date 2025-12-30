@@ -19,6 +19,7 @@ pub struct DashboardTemplate {
     pub samba_status: bool,
     pub minidlna_status: bool,
     pub is_authenticated: bool,
+    pub server_power: String,
 }
 
 pub struct DiskInfo {

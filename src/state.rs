@@ -19,4 +19,5 @@ lazy_static! {
         child_pid: None,
         target_dir: None,
     });
+    pub static ref POWER_CONSUMPTION: Mutex<f32> = Mutex::new(0.0);
 }
