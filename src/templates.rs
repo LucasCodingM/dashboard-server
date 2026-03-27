@@ -15,7 +15,7 @@ pub struct DashboardTemplate {
     pub used_memory: String,
     pub memory_percentage: u32,
     pub disks: Vec<DiskInfo>,
-    pub bot_status: bool,
+    pub declin_web_status: bool,
     pub samba_status: bool,
     pub minidlna_status: bool,
     pub is_authenticated: bool,

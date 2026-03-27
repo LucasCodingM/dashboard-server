@@ -58,7 +58,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let (cpu_usage, cpu_model, cpu_temp, cpu_temp_val) = get_cpu_info(&sys, &components);
     let (total_memory, used_memory, memory_percentage) = get_memory_info(&sys);
     let disks_info = get_disks_info(&disks);
-    let (bot_status, samba_status, minidlna_status) = get_services_status(&sys);
+    let (declin_web_status, samba_status, minidlna_status) = get_services_status(&sys);
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
     let server_power = format!("{:.2} W", power_val);
@@ -74,7 +74,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         used_memory,
         memory_percentage,
         disks: disks_info,
-        bot_status,
+        declin_web_status,
         samba_status,
         minidlna_status,
         is_authenticated,
@@ -206,12 +206,23 @@ fn get_disks_info(disks: &Disks) -> Vec<DiskInfo> {
     result
 }
 
+fn check_declin_web_status() -> bool {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+    let path = format!("{}/izeria/declin-web", home);
+    Command::new("docker")
+        .args(["compose", "--profile", "mt5", "ps", "-q"])
+        .current_dir(&path)
+        .output()
+        .map(|output| !output.stdout.trim_ascii().is_empty())
+        .unwrap_or(false)
+}
+
 fn get_services_status(sys: &System) -> (bool, bool, bool) {
-    let bot_status = sys.processes_by_name(OsStr::new("declin_bot")).next().is_some();
+    let declin_web_status = check_declin_web_status();
     let samba_status = sys.processes_by_name(OsStr::new("smbd")).next().is_some();
     let minidlna_status = sys.processes_by_name(OsStr::new("minidlna")).next().is_some();
-    
-    (bot_status, samba_status, minidlna_status)
+
+    (declin_web_status, samba_status, minidlna_status)
 }
 
 pub async fn service_handler(Path((service, action)): Path<(String, String)>, headers: HeaderMap) -> impl IntoResponse {
@@ -219,8 +230,21 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
 
+    if service == "declin-web" {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+        let path = format!("{}/izeria/declin-web", home);
+        let args: &[&str] = match action.as_str() {
+            "start" => &["compose", "--profile", "mt5", "up", "-d", "--build"],
+            "stop"  => &["compose", "--profile", "mt5", "down"],
+            _ => return (StatusCode::BAD_REQUEST, "Invalid action").into_response(),
+        };
+        return match Command::new("docker").args(args).current_dir(&path).status() {
+            Ok(status) if status.success() => StatusCode::OK.into_response(),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Command failed").into_response(),
+        };
+    }
+
     let service_name = match service.as_str() {
-        "bot" => "declin_bot",
         "samba" => "smbd",
         "minidlna" => "minidlna",
         _ => return (StatusCode::BAD_REQUEST, "Unknown service").into_response(),

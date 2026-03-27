@@ -1,181 +1,232 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Monitor</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/style.css?v=1.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=2.0.0">
 </head>
 <body>
-    <div class="top-right-auth">
-        {% if is_authenticated %}
-            <!-- Si authentifié : Bouton d'extinction et Déconnexion -->
-            <form action="/shutdown" method="post" onsubmit="return confirm('Are you sure you want to shutdown the server ?');">
-                <button type="submit" class="btn-shutdown">Shutdown</button>
-            </form>
-            
-            <form action="/reboot" method="post" onsubmit="return confirm('Are you sure you want to reboot the server ?');">
-                <button type="submit" class="btn-reboot">Restart</button>
-            </form>
-            
-            <form action="/logout" method="post">
-                <button type="submit" class="btn-logout">Logout</button>
-            </form>
-        {% else %}
-            <!-- Sinon : Formulaire de connexion -->
-            <form action="/login" method="post" class="login-form" style="flex-direction: row;">
-                <input type="password" name="password" placeholder="Mot de passe" required style="padding: 5px;">
-                <button type="submit" class="btn-login">Login</button>
-            </form>
-        {% endif %}
-    </div>
-    <h1>Server Lucas</h1>
-    
-    <div class="tabs">
-        <button class="tab-link active" onclick="openTab(event, 'dashboard-tab')">Dashboard</button>
-        <button class="tab-link" onclick="openTab(event, 'downloader-tab')">Downloader</button>
-    </div>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-title">
+            <div class="dot"></div>
+            Server Lucas
+        </div>
+        <div class="header-right">
+            <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode">🌙</button>
 
-    <div id="dashboard-tab" class="tab-content" style="display: block;">
-        <div class="admin-grid">
-            <div id="dashboard">
-                <div class="card cpu-card">
-                    <h3>CPU</h3>
-                    <p style="font-size: 0.85em; color: #666; margin-bottom: 5px;">{{ cpu_model }}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <p><span id="cpu-value">{{ cpu_usage }}</span>%</p>
-                        <p style="font-weight: bold; color: {% if cpu_temp_val < 33.333 %}#4caf50{% else if cpu_temp_val < 100.0 %}#ff9800{% else %}#d32f2f{% endif %};">🌡️ {{ cpu_temp }}</p>
-                    </div>
-                    <div class="bar-container">
-                        <div class="bar" style="width: {{ cpu_usage }}%"></div>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="cpuChart" hx-preserve></canvas>
-                    </div>
-                </div>
+            {% if is_authenticated %}
+                <form action="/shutdown" method="post" onsubmit="return confirm('Éteindre le serveur ?');">
+                    <button type="submit" class="btn-shutdown">⏻ Shutdown</button>
+                </form>
+                <form action="/reboot" method="post" onsubmit="return confirm('Redémarrer le serveur ?');">
+                    <button type="submit" class="btn-reboot">↺ Restart</button>
+                </form>
+                <form action="/logout" method="post">
+                    <button type="submit" class="btn-logout">Logout</button>
+                </form>
+            {% else %}
+                <form action="/login" method="post" class="login-form">
+                    <input type="password" name="password" placeholder="Mot de passe" required>
+                    <button type="submit" class="btn-login">Login</button>
+                </form>
+            {% endif %}
+        </div>
+    </header>
 
-                <div class="card ram-card">
-                    <h3>Memory (RAM)</h3>
-                    <p><strong>Used:</strong> {{ used_memory }}</p>
-                    <p><strong>Total:</strong> {{ total_memory }}</p>
-                    <div class="bar-container">
-                        <div class="bar" style="width: {{ memory_percentage }}%"></div>
-                    </div>
-                    <p style="text-align: center; margin-top: 10px;">{{ memory_percentage }}% utilized</p>
-                </div>
+    <div class="main-content">
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTab(event, 'dashboard-tab')">Dashboard</button>
+            <button class="tab-link" onclick="openTab(event, 'downloader-tab')">Downloader</button>
+        </div>
 
-                <div class="card power-card">
-                    <h3>Power Consumption</h3>
-                    <div style="text-align: center; padding: 15px 0;">
-                        <span style="font-size: 2em; font-weight: bold; color: #f57c00;">⚡ {{ server_power }}</span>
-                    </div>
-                </div>
-
-                <div class="card disks-card">
-                    <h3>Storage</h3>
-                    {% for disk in disks %}
-                    <div style="margin-bottom: 15px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                            <span style="font-weight: bold; font-size: 0.9em;">{{ disk.name }}</span>
-                            <span style="font-size: 0.8em; color: #666;">{{ disk.used }} / {{ disk.total }}</span>
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content" style="display: block;">
+            <div class="admin-grid">
+                <div id="dashboard">
+                    <!-- CPU Card -->
+                    <div class="card cpu-card">
+                        <h3>CPU</h3>
+                        <div class="stat-row">
+                            <div>
+                                <div class="stat-value"><span id="cpu-value">{{ cpu_usage }}</span><span style="font-size:1.2rem;color:var(--text-muted)">%</span></div>
+                                <div class="stat-sub">{{ cpu_model }}</div>
+                            </div>
+                            <span class="temp-badge {% if cpu_temp_val < 50.0 %}temp-ok{% else if cpu_temp_val < 80.0 %}temp-warn{% else %}temp-hot{% endif %}">
+                                🌡️ {{ cpu_temp }}
+                            </span>
                         </div>
                         <div class="bar-container">
-                            <div class="bar" style="width: {{ disk.percentage }}%;"></div>
+                            <div class="bar {% if cpu_usage > 80 %}bar-danger{% else if cpu_usage > 60 %}bar-warn{% endif %}" style="width: {{ cpu_usage }}%"></div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="cpuChart" hx-preserve></canvas>
                         </div>
                     </div>
-                    {% endfor %}
-                </div>
 
-                <div class="card services-card">
-                    <h3>Services</h3>
-                    <div class="service-row">
-                        <span>Bot ({% if bot_status %}Running{% else %}Stopped{% endif %})</span>
-                        {% if is_authenticated %}
-                            <label class="switch">
-                                <input type="checkbox" {% if bot_status %}checked{% endif %} 
-                                    hx-post="/service/bot/{% if bot_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                <span class="slider"></span>
-                            </label>
-                        {% else %}
-                            <div class="led {% if bot_status %}led-green{% else %}led-red{% endif %}"></div>
-                        {% endif %}
+                    <!-- RAM Card -->
+                    <div class="card ram-card">
+                        <h3>Memory (RAM)</h3>
+                        <div class="stat-row">
+                            <div>
+                                <div class="stat-value">{{ memory_percentage }}<span style="font-size:1.2rem;color:var(--text-muted)">%</span></div>
+                                <div class="stat-sub">{{ used_memory }} / {{ total_memory }}</div>
+                            </div>
+                        </div>
+                        <div class="bar-container">
+                            <div class="bar {% if memory_percentage > 85 %}bar-danger{% else if memory_percentage > 65 %}bar-warn{% endif %}" style="width: {{ memory_percentage }}%"></div>
+                        </div>
                     </div>
-                    <div class="service-row">
-                        <span>Samba ({% if samba_status %}Running{% else %}Stopped{% endif %})</span>
-                        {% if is_authenticated %}
-                            <label class="switch">
-                                <input type="checkbox" {% if samba_status %}checked{% endif %} 
-                                    hx-post="/service/samba/{% if samba_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                <span class="slider"></span>
-                            </label>
-                        {% else %}
-                            <div class="led {% if samba_status %}led-green{% else %}led-red{% endif %}"></div>
-                        {% endif %}
+
+                    <!-- Power Card -->
+                    <div class="card power-card">
+                        <h3>Consommation</h3>
+                        <div class="power-value">⚡ {{ server_power }}</div>
                     </div>
-                    <div class="service-row">
-                        <span>MiniDLNA ({% if minidlna_status %}Running{% else %}Stopped{% endif %})</span>
-                        {% if is_authenticated %}
-                            <label class="switch">
-                                <input type="checkbox" {% if minidlna_status %}checked{% endif %} 
-                                    hx-post="/service/minidlna/{% if minidlna_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                <span class="slider"></span>
-                            </label>
-                        {% else %}
-                            <div class="led {% if minidlna_status %}led-green{% else %}led-red{% endif %}"></div>
-                        {% endif %}
+
+                    <!-- Services Card -->
+                    <div class="card services-card">
+                        <h3>Services</h3>
+
+                        <!-- declin-web -->
+                        <div class="service-row">
+                            <div>
+                                <div class="service-name">declin-web</div>
+                                <div class="service-status">{% if declin_web_status %}Running{% else %}Stopped{% endif %}</div>
+                            </div>
+                            {% if is_authenticated %}
+                                <label class="switch">
+                                    <input type="checkbox" {% if declin_web_status %}checked{% endif %}
+                                        hx-post="/service/declin-web/{% if declin_web_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                    <span class="slider"></span>
+                                </label>
+                            {% else %}
+                                <div class="led {% if declin_web_status %}led-green{% else %}led-red{% endif %}"></div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Samba -->
+                        <div class="service-row">
+                            <div>
+                                <div class="service-name">Samba</div>
+                                <div class="service-status">{% if samba_status %}Running{% else %}Stopped{% endif %}</div>
+                            </div>
+                            {% if is_authenticated %}
+                                <label class="switch">
+                                    <input type="checkbox" {% if samba_status %}checked{% endif %}
+                                        hx-post="/service/samba/{% if samba_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                    <span class="slider"></span>
+                                </label>
+                            {% else %}
+                                <div class="led {% if samba_status %}led-green{% else %}led-red{% endif %}"></div>
+                            {% endif %}
+                        </div>
+
+                        <!-- MiniDLNA -->
+                        <div class="service-row">
+                            <div>
+                                <div class="service-name">MiniDLNA</div>
+                                <div class="service-status">{% if minidlna_status %}Running{% else %}Stopped{% endif %}</div>
+                            </div>
+                            {% if is_authenticated %}
+                                <label class="switch">
+                                    <input type="checkbox" {% if minidlna_status %}checked{% endif %}
+                                        hx-post="/service/minidlna/{% if minidlna_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                    <span class="slider"></span>
+                                </label>
+                            {% else %}
+                                <div class="led {% if minidlna_status %}led-green{% else %}led-red{% endif %}"></div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Disks Card -->
+                    <div class="card disks-card">
+                        <h3>Stockage</h3>
+                        <div class="disk-grid">
+                            {% for disk in disks %}
+                            <div class="disk-item">
+                                <div class="disk-label">
+                                    <span class="disk-name">{{ disk.name }}</span>
+                                    <span class="disk-sizes">{{ disk.used }} / {{ disk.total }}</span>
+                                </div>
+                                <div class="bar-container">
+                                    <div class="bar {% if disk.percentage > 85 %}bar-danger{% else if disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%;"></div>
+                                </div>
+                                <div class="disk-pct">{{ disk.percentage }}%</div>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div id="downloader-tab" class="tab-content">
-        <div class="downloader-form">
-            <h2>Download helper</h2>
-            {% if is_authenticated %}
-            <form hx-post="/download" hx-swap="innerHTML" hx-target="#download-response">
-                <div style="margin-bottom: 1rem;">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">URL (Fichier ou YouTube)</label>
-                    <input type="text" name="url" placeholder="https://..." required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                </div>
-                
-                <div style="margin-bottom: 1rem;">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Type de contenu</label>
-                    <select name="category" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                        <option value="video">Vidéo (/stockage/videos)</option>
-                        <option value="film">Film (/stockage/videos/films)</option>
-                        <option value="other">Autre (/stockage/telechargements)</option>
-                    </select>
-                </div>
-
-                <button type="submit" class="btn btn-primary">Download</button>
-            </form>
-            <div id="download-response" style="margin-top: 1rem; font-weight: bold; color: #4caf50;"></div>
-            {% else %}
-            <p>Please login to access download.</p>
-            {% endif %}
+        <!-- Downloader Tab -->
+        <div id="downloader-tab" class="tab-content">
+            <div class="downloader-form">
+                <h2>Download helper</h2>
+                {% if is_authenticated %}
+                <form hx-post="/download" hx-swap="innerHTML" hx-target="#download-response">
+                    <div style="margin-bottom: 1rem;">
+                        <label class="form-label">URL (Fichier ou YouTube)</label>
+                        <input type="text" name="url" placeholder="https://..." required class="form-input">
+                    </div>
+                    <div style="margin-bottom: 1.25rem;">
+                        <label class="form-label">Type de contenu</label>
+                        <select name="category" class="form-select">
+                            <option value="video">Vidéo (/stockage/videos)</option>
+                            <option value="film">Film (/stockage/videos/films)</option>
+                            <option value="other">Autre (/stockage/telechargements)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">⬇ Download</button>
+                </form>
+                <div id="download-response" style="margin-top: 1rem; font-weight: bold; color: #22c55e;"></div>
+                {% else %}
+                <p style="color: var(--text-muted);">Connectez-vous pour accéder au téléchargement.</p>
+                {% endif %}
+            </div>
         </div>
     </div>
 
+    <!-- HTMX auto-refresh -->
     <div hx-get="/" hx-trigger="every 1s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML"></div>
 
-    <script src="/static/dashboard.js?v=3"></script>
+    <script src="/static/dashboard.js?v=4"></script>
     <script>
+        // ---- Tab switching ----
         function openTab(evt, tabName) {
-            var i, tabcontent, tablinks;
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-            }
-            tablinks = document.getElementsByClassName("tab-link");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].className = tablinks[i].className.replace(" active", "");
-            }
-            document.getElementById(tabName).style.display = "block";
-            evt.currentTarget.className += " active";
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).style.display = 'block';
+            evt.currentTarget.classList.add('active');
         }
+
+        // ---- Dark / Light mode ----
+        const html = document.documentElement;
+        const toggleBtn = document.getElementById('theme-toggle');
+
+        function applyTheme(theme) {
+            html.setAttribute('data-theme', theme);
+            toggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+            localStorage.setItem('theme', theme);
+            if (typeof updateChartTheme === 'function') updateChartTheme(theme);
+        }
+
+        // Init from saved preference or system
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+
+        toggleBtn.addEventListener('click', () => {
+            const current = html.getAttribute('data-theme');
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        });
     </script>
 </body>
 </html>
