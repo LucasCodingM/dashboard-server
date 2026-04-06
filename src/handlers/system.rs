@@ -250,10 +250,10 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
     if service == "declin-discord" {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
         let bot_path = std::env::var("DECLIN_DISCORD_BOT_PATH")
-            .unwrap_or_else(|_| format!("{}/izeria/declin-discord/bot", home));
+            .unwrap_or_else(|_| format!("{}/app/declin-discord", home));
         return match action.as_str() {
             "start" => match Command::new("setsid")
-                .args(["cargo", "run"])
+                .arg(format!("{}/declin-discord", bot_path))
                 .current_dir(&bot_path)
                 .stdin(std::process::Stdio::null())
                 .stdout(std::process::Stdio::inherit())
@@ -261,11 +261,13 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
                 .spawn()
             {
                 Ok(child) => {
-                    // setsid makes cargo the leader of a new process group (PGID = PID)
                     *DISCORD_BOT_PID.lock().unwrap() = Some(child.id());
                     StatusCode::OK.into_response()
                 },
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to start: {e}")).into_response(),
+                Err(e) => {
+                    eprintln!("Failed to start declin-discord: {e}");
+                    (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to start: {e}")).into_response()
+                },
             },
             "stop" => {
                 if let Some(pid) = *DISCORD_BOT_PID.lock().unwrap() {
