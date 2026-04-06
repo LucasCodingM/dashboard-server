@@ -8,7 +8,7 @@ use std::process::Command;
 use sysinfo::{System, Components, Disks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
-use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION};
+use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION, DISCORD_BOT_PID};
 use crate::templates::{DashboardTemplate, DiskInfo};
 use crate::auth::check_auth;
 
@@ -58,7 +58,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let (cpu_usage, cpu_model, cpu_temp, cpu_temp_val) = get_cpu_info(&sys, &components);
     let (total_memory, used_memory, memory_percentage) = get_memory_info(&sys);
     let disks_info = get_disks_info(&disks);
-    let (declin_web_status, samba_status, minidlna_status) = get_services_status(&sys);
+    let (declin_web_status, declin_discord_status, samba_status, minidlna_status) = get_services_status(&sys);
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
     let server_power = format!("{:.2} W", power_val);
@@ -75,6 +75,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         memory_percentage,
         disks: disks_info,
         declin_web_status,
+        declin_discord_status,
         samba_status,
         minidlna_status,
         is_authenticated,
@@ -217,17 +218,49 @@ fn check_declin_web_status() -> bool {
         .unwrap_or(false)
 }
 
-fn get_services_status(sys: &System) -> (bool, bool, bool) {
+fn get_services_status(sys: &System) -> (bool, bool, bool, bool) {
     let declin_web_status = check_declin_web_status();
+    let declin_discord_status = sys.processes_by_name(OsStr::new("declin-discord")).next().is_some();
     let samba_status = sys.processes_by_name(OsStr::new("smbd")).next().is_some();
     let minidlna_status = sys.processes_by_name(OsStr::new("minidlna")).next().is_some();
 
-    (declin_web_status, samba_status, minidlna_status)
+    (declin_web_status, declin_discord_status, samba_status, minidlna_status)
 }
 
 pub async fn service_handler(Path((service, action)): Path<(String, String)>, headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+
+    if service == "declin-discord" {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+        let bot_path = std::env::var("DECLIN_DISCORD_BOT_PATH")
+            .unwrap_or_else(|_| format!("{}/izeria/declin-discord/bot", home));
+        return match action.as_str() {
+            "start" => match Command::new("setsid")
+                .args(["cargo", "run"])
+                .current_dir(&bot_path)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .spawn()
+            {
+                Ok(child) => {
+                    // setsid makes cargo the leader of a new process group (PGID = PID)
+                    *DISCORD_BOT_PID.lock().unwrap() = Some(child.id());
+                    StatusCode::OK.into_response()
+                },
+                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to start: {e}")).into_response(),
+            },
+            "stop" => {
+                if let Some(pid) = *DISCORD_BOT_PID.lock().unwrap() {
+                    Command::new("kill").args(["-TERM", &format!("-{pid}")]).status().ok();
+                }
+                *DISCORD_BOT_PID.lock().unwrap() = None;
+                StatusCode::OK.into_response()
+            },
+            _ => (StatusCode::BAD_REQUEST, "Invalid action").into_response(),
+        };
     }
 
     if service == "declin-web" {

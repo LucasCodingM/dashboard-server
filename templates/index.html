@@ -56,12 +56,12 @@
                                 <div class="stat-value"><span id="cpu-value">{{ cpu_usage }}</span><span style="font-size:1.2rem;color:var(--text-muted)">%</span></div>
                                 <div class="stat-sub">{{ cpu_model }}</div>
                             </div>
-                            <span class="temp-badge {% if cpu_temp_val < 50.0 %}temp-ok{% else if cpu_temp_val < 80.0 %}temp-warn{% else %}temp-hot{% endif %}">
+                            <span class="temp-badge {% if cpu_temp_val < 50.0 %}temp-ok{% elif cpu_temp_val < 80.0 %}temp-warn{% else %}temp-hot{% endif %}">
                                 🌡️ {{ cpu_temp }}
                             </span>
                         </div>
                         <div class="bar-container">
-                            <div class="bar {% if cpu_usage > 80 %}bar-danger{% else if cpu_usage > 60 %}bar-warn{% endif %}" style="width: {{ cpu_usage }}%"></div>
+                            <div class="bar {% if cpu_usage > 80 %}bar-danger{% elif cpu_usage > 60 %}bar-warn{% endif %}" style="width: {{ cpu_usage }}%"></div>
                         </div>
                         <div class="chart-container">
                             <canvas id="cpuChart" hx-preserve></canvas>
@@ -78,7 +78,7 @@
                             </div>
                         </div>
                         <div class="bar-container">
-                            <div class="bar {% if memory_percentage > 85 %}bar-danger{% else if memory_percentage > 65 %}bar-warn{% endif %}" style="width: {{ memory_percentage }}%"></div>
+                            <div class="bar {% if memory_percentage > 85 %}bar-danger{% elif memory_percentage > 65 %}bar-warn{% endif %}" style="width: {{ memory_percentage }}%"></div>
                         </div>
                     </div>
 
@@ -106,6 +106,23 @@
                                 </label>
                             {% else %}
                                 <div class="led {% if declin_web_status %}led-green{% else %}led-red{% endif %}"></div>
+                            {% endif %}
+                        </div>
+
+                        <!-- declin-discord (bot) -->
+                        <div class="service-row">
+                            <div>
+                                <div class="service-name">declin-discord</div>
+                                <div class="service-status">{% if declin_discord_status %}Running{% else %}Stopped{% endif %}</div>
+                            </div>
+                            {% if is_authenticated %}
+                                <label class="switch">
+                                    <input type="checkbox" {% if declin_discord_status %}checked{% endif %}
+                                        hx-post="/service/declin-discord/{% if declin_discord_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                    <span class="slider"></span>
+                                </label>
+                            {% else %}
+                                <div class="led {% if declin_discord_status %}led-green{% else %}led-red{% endif %}"></div>
                             {% endif %}
                         </div>
 
@@ -155,7 +172,7 @@
                                     <span class="disk-sizes">{{ disk.used }} / {{ disk.total }}</span>
                                 </div>
                                 <div class="bar-container">
-                                    <div class="bar {% if disk.percentage > 85 %}bar-danger{% else if disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%;"></div>
+                                    <div class="bar {% if disk.percentage > 85 %}bar-danger{% elif disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%"></div>
                                 </div>
                                 <div class="disk-pct">{{ disk.percentage }}%</div>
                             </div>
