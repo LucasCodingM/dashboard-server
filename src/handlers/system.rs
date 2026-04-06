@@ -260,8 +260,9 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
                 .stderr(std::process::Stdio::inherit())
                 .spawn()
             {
-                Ok(child) => {
+                Ok(mut child) => {
                     *DISCORD_BOT_PID.lock().unwrap() = Some(child.id());
+                    std::thread::spawn(move || { child.wait().ok(); });
                     StatusCode::OK.into_response()
                 },
                 Err(e) => {
