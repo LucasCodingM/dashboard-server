@@ -6,10 +6,9 @@
     <title>Server Monitor</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/static/style.css?v=2.0.0">
+    <link rel="stylesheet" href="/static/style.css?v=3.0.0">
 </head>
 <body>
-    <!-- Header -->
     <header class="header">
         <div class="header-title">
             <div class="dot"></div>
@@ -38,7 +37,6 @@
     </header>
 
     <div class="main-content">
-        <!-- Tabs -->
         <div class="tabs">
             <button class="tab-link active" onclick="openTab(event, 'dashboard-tab')">Dashboard</button>
             <button class="tab-link" onclick="openTab(event, 'downloader-tab')">Downloader</button>
@@ -48,12 +46,15 @@
         <div id="dashboard-tab" class="tab-content" style="display: block;">
             <div class="admin-grid">
                 <div id="dashboard">
+
                     <!-- CPU Card -->
                     <div class="card cpu-card">
                         <h3>CPU</h3>
                         <div class="stat-row">
                             <div>
-                                <div class="stat-value"><span id="cpu-value">{{ cpu_usage }}</span><span style="font-size:1.2rem;color:var(--text-muted)">%</span></div>
+                                <div class="stat-value">
+                                    <span id="cpu-value">{{ cpu_usage }}</span><span class="stat-unit">%</span>
+                                </div>
                                 <div class="stat-sub">{{ cpu_model }}</div>
                             </div>
                             <span class="temp-badge {% if cpu_temp_val < 50.0 %}temp-ok{% elif cpu_temp_val < 80.0 %}temp-warn{% else %}temp-hot{% endif %}">
@@ -70,33 +71,58 @@
 
                     <!-- RAM Card -->
                     <div class="card ram-card">
-                        <h3>Memory (RAM)</h3>
+                        <h3>Mémoire</h3>
                         <div class="stat-row">
                             <div>
-                                <div class="stat-value">{{ memory_percentage }}<span style="font-size:1.2rem;color:var(--text-muted)">%</span></div>
+                                <div class="stat-value">
+                                    <span id="ram-value">{{ memory_percentage }}</span><span class="stat-unit">%</span>
+                                </div>
                                 <div class="stat-sub">{{ used_memory }} / {{ total_memory }}</div>
                             </div>
                         </div>
                         <div class="bar-container">
                             <div class="bar {% if memory_percentage > 85 %}bar-danger{% elif memory_percentage > 65 %}bar-warn{% endif %}" style="width: {{ memory_percentage }}%"></div>
                         </div>
+                        <div class="chart-container chart-container--sm">
+                            <canvas id="ramChart" hx-preserve></canvas>
+                        </div>
                     </div>
 
-                    <!-- Power Card -->
-                    <div class="card power-card">
-                        <h3>Consommation</h3>
-                        <div class="power-value">⚡ {{ server_power }}</div>
+                    <!-- System Card -->
+                    <div class="card system-card">
+                        <h3>Système</h3>
+                        <div class="system-stats">
+                            <div class="system-stat">
+                                <div class="system-stat-icon power-icon">⚡</div>
+                                <div>
+                                    <div class="system-stat-value">{{ server_power }}</div>
+                                    <div class="stat-sub">Consommation</div>
+                                </div>
+                            </div>
+                            <div class="system-divider"></div>
+                            <div class="system-stat">
+                                <div class="system-stat-icon uptime-icon">⏱</div>
+                                <div>
+                                    <div class="system-stat-value">{{ uptime_str }}</div>
+                                    <div class="stat-sub">Uptime</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Services Card -->
                     <div class="card services-card">
                         <h3>Services</h3>
 
-                        <!-- declin-web -->
                         <div class="service-row">
-                            <div>
-                                <div class="service-name">declin-web</div>
-                                <div class="service-status">{% if declin_web_status %}Running{% else %}Stopped{% endif %}</div>
+                            <div class="service-info">
+                                <span class="service-icon">🌐</span>
+                                <div>
+                                    <div class="service-name">declin-web</div>
+                                    <span class="status-badge {% if declin_web_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                        {% if declin_web_status %}Running{% else %}Stopped{% endif %}
+                                    </span>
+                                </div>
                             </div>
                             {% if is_authenticated %}
                                 <label class="switch">
@@ -109,11 +135,15 @@
                             {% endif %}
                         </div>
 
-                        <!-- declin-discord (bot) -->
                         <div class="service-row">
-                            <div>
-                                <div class="service-name">declin-discord</div>
-                                <div class="service-status">{% if declin_discord_status %}Running{% else %}Stopped{% endif %}</div>
+                            <div class="service-info">
+                                <span class="service-icon">🤖</span>
+                                <div>
+                                    <div class="service-name">declin-discord</div>
+                                    <span class="status-badge {% if declin_discord_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                        {% if declin_discord_status %}Running{% else %}Stopped{% endif %}
+                                    </span>
+                                </div>
                             </div>
                             {% if is_authenticated %}
                                 <label class="switch">
@@ -126,11 +156,15 @@
                             {% endif %}
                         </div>
 
-                        <!-- Samba -->
                         <div class="service-row">
-                            <div>
-                                <div class="service-name">Samba</div>
-                                <div class="service-status">{% if samba_status %}Running{% else %}Stopped{% endif %}</div>
+                            <div class="service-info">
+                                <span class="service-icon">📁</span>
+                                <div>
+                                    <div class="service-name">Samba</div>
+                                    <span class="status-badge {% if samba_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                        {% if samba_status %}Running{% else %}Stopped{% endif %}
+                                    </span>
+                                </div>
                             </div>
                             {% if is_authenticated %}
                                 <label class="switch">
@@ -143,11 +177,15 @@
                             {% endif %}
                         </div>
 
-                        <!-- MiniDLNA -->
                         <div class="service-row">
-                            <div>
-                                <div class="service-name">MiniDLNA</div>
-                                <div class="service-status">{% if minidlna_status %}Running{% else %}Stopped{% endif %}</div>
+                            <div class="service-info">
+                                <span class="service-icon">📺</span>
+                                <div>
+                                    <div class="service-name">MiniDLNA</div>
+                                    <span class="status-badge {% if minidlna_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                        {% if minidlna_status %}Running{% else %}Stopped{% endif %}
+                                    </span>
+                                </div>
                             </div>
                             {% if is_authenticated %}
                                 <label class="switch">
@@ -168,17 +206,18 @@
                             {% for disk in disks %}
                             <div class="disk-item">
                                 <div class="disk-label">
-                                    <span class="disk-name">{{ disk.name }}</span>
-                                    <span class="disk-sizes">{{ disk.used }} / {{ disk.total }}</span>
+                                    <span class="disk-name">💾 {{ disk.name }}</span>
+                                    <span class="disk-pct {% if disk.percentage > 85 %}disk-pct-hot{% elif disk.percentage > 65 %}disk-pct-warn{% endif %}">{{ disk.percentage }}%</span>
                                 </div>
                                 <div class="bar-container">
                                     <div class="bar {% if disk.percentage > 85 %}bar-danger{% elif disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%"></div>
                                 </div>
-                                <div class="disk-pct">{{ disk.percentage }}%</div>
+                                <div class="disk-sizes">{{ disk.used }} / {{ disk.total }}</div>
                             </div>
                             {% endfor %}
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -211,12 +250,10 @@
         </div>
     </div>
 
-    <!-- HTMX auto-refresh -->
     <div hx-get="/" hx-trigger="every 1s" hx-select="#dashboard" hx-target="#dashboard" hx-swap="outerHTML"></div>
 
-    <script src="/static/dashboard.js?v=4"></script>
+    <script src="/static/dashboard.js?v=5"></script>
     <script>
-        // ---- Tab switching ----
         function openTab(evt, tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active'));
@@ -224,7 +261,6 @@
             evt.currentTarget.classList.add('active');
         }
 
-        // ---- Dark / Light mode ----
         const html = document.documentElement;
         const toggleBtn = document.getElementById('theme-toggle');
 
@@ -235,7 +271,6 @@
             if (typeof updateChartTheme === 'function') updateChartTheme(theme);
         }
 
-        // Init from saved preference or system
         const saved = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         applyTheme(saved || (prefersDark ? 'dark' : 'light'));

@@ -21,6 +21,7 @@ pub struct DashboardTemplate {
     pub minidlna_status: bool,
     pub is_authenticated: bool,
     pub server_power: String,
+    pub uptime_str: String,
 }
 
 pub struct DiskInfo {

@@ -62,6 +62,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
     let server_power = format!("{:.2} W", power_val);
+    let uptime_str = format_uptime(System::uptime());
 
     let is_authenticated = check_auth(&headers);
 
@@ -80,6 +81,20 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         minidlna_status,
         is_authenticated,
         server_power,
+        uptime_str,
+    }
+}
+
+fn format_uptime(secs: u64) -> String {
+    let days = secs / 86400;
+    let hours = (secs % 86400) / 3600;
+    let mins = (secs % 3600) / 60;
+    if days > 0 {
+        format!("{}j {}h {}m", days, hours, mins)
+    } else if hours > 0 {
+        format!("{}h {}m", hours, mins)
+    } else {
+        format!("{}m", mins)
     }
 }
 
