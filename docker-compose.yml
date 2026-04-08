@@ -19,3 +19,4 @@ services:
       # Disques de stockage physiques (rw pour les téléchargements)
       - /stockage:/stockage
     privileged: true
+    user: root
