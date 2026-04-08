@@ -1,0 +1,20 @@
+services:
+  dashboard:
+    build: .
+    container_name: dashboard-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - IS_DOCKER=true
+      - DECLIN_DISCORD_PATH=/declin-discord
+    volumes:
+      # Accès au daemon Docker de l'hôte (pour start/stop du bot)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Sources declin-discord pour que docker compose puisse builder le bot
+      - ../declin-discord:/declin-discord
+    # Même GID que le socket Docker de l'hôte (généralement 998 ou 999)
+    group_add:
+      - "${DOCKER_GID:-999}"
