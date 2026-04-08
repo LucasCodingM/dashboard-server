@@ -16,9 +16,6 @@ services:
       # Sources des projets pour docker compose
       - ../declin-discord:/declin-discord
       - ../declin-web:/declin-web
-      # RAPL (consommation CPU)
-      - /sys/class/powercap:/sys/class/powercap:ro
       # Disques de stockage physiques (rw pour les téléchargements)
       - /stockage:/stockage
-    group_add:
-      - "${DOCKER_GID:-999}"
+    privileged: true

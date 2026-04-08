@@ -228,14 +228,10 @@ fn tcp_up(addr: &str) -> bool {
 }
 
 fn check_declin_web_status() -> bool {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-    let path = std::env::var("DECLIN_WEB_PATH")
-        .unwrap_or_else(|_| format!("{}/izeria/declin-web", home));
     Command::new("docker")
-        .args(["compose", "--profile", "mt5", "ps", "-q"])
-        .current_dir(&path)
+        .args(["inspect", "--format={{.State.Running}}", "declin-web"])
         .output()
-        .map(|output| !output.stdout.trim_ascii().is_empty())
+        .map(|o| o.stdout.starts_with(b"true"))
         .unwrap_or(false)
 }
 
