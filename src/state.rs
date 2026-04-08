@@ -20,5 +20,4 @@ lazy_static! {
         target_dir: None,
     });
     pub static ref POWER_CONSUMPTION: Mutex<f32> = Mutex::new(0.0);
-    pub static ref DISCORD_BOT_PID: Mutex<Option<u32>> = Mutex::new(None);
 }
