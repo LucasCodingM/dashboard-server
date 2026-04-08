@@ -53,9 +53,7 @@ fn monitor_consumption() {
 async fn main() {
     dotenv::dotenv().ok();
 
-    if std::env::var("IS_DOCKER").as_deref() != Ok("true") {
-        monitor_consumption();
-    }
+    monitor_consumption();
 
     let app = Router::new()
         .route("/", get(system::dashboard_handler))

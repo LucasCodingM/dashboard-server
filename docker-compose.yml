@@ -3,18 +3,22 @@ services:
     build: .
     container_name: dashboard-server
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    network_mode: host
     env_file:
       - .env
     environment:
       - IS_DOCKER=true
       - DECLIN_DISCORD_PATH=/declin-discord
+      - DECLIN_WEB_PATH=/declin-web
     volumes:
-      # Accès au daemon Docker de l'hôte (pour start/stop du bot)
+      # Docker daemon host (contrôle des services)
       - /var/run/docker.sock:/var/run/docker.sock
-      # Sources declin-discord pour que docker compose puisse builder le bot
+      # Sources des projets pour docker compose
       - ../declin-discord:/declin-discord
-    # Même GID que le socket Docker de l'hôte (généralement 998 ou 999)
+      - ../declin-web:/declin-web
+      # RAPL (consommation CPU)
+      - /sys/class/powercap:/sys/class/powercap:ro
+      # Disques de stockage physiques (rw pour les téléchargements)
+      - /stockage:/stockage
     group_add:
       - "${DOCKER_GID:-999}"

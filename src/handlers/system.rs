@@ -3,8 +3,9 @@ use axum::{
     http::{StatusCode, HeaderMap},
     response::IntoResponse,
 };
-use std::ffi::OsStr;
+use std::net::TcpStream;
 use std::process::Command;
+use std::time::Duration;
 use sysinfo::{System, Components, Disks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
@@ -222,9 +223,14 @@ fn get_disks_info(disks: &Disks) -> Vec<DiskInfo> {
     result
 }
 
+fn tcp_up(addr: &str) -> bool {
+    TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(300)).is_ok()
+}
+
 fn check_declin_web_status() -> bool {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-    let path = format!("{}/izeria/declin-web", home);
+    let path = std::env::var("DECLIN_WEB_PATH")
+        .unwrap_or_else(|_| format!("{}/izeria/declin-web", home));
     Command::new("docker")
         .args(["compose", "--profile", "mt5", "ps", "-q"])
         .current_dir(&path)
@@ -233,15 +239,15 @@ fn check_declin_web_status() -> bool {
         .unwrap_or(false)
 }
 
-fn get_services_status(sys: &System) -> (bool, bool, bool, bool) {
+fn get_services_status(_sys: &System) -> (bool, bool, bool, bool) {
     let declin_web_status = check_declin_web_status();
     let declin_discord_status = Command::new("docker")
         .args(["inspect", "--format={{.State.Running}}", "declin-discord-bot"])
         .output()
         .map(|o| o.stdout.starts_with(b"true"))
         .unwrap_or(false);
-    let samba_status = sys.processes_by_name(OsStr::new("smbd")).next().is_some();
-    let minidlna_status = sys.processes_by_name(OsStr::new("minidlna")).next().is_some();
+    let samba_status    = tcp_up("127.0.0.1:445");
+    let minidlna_status = tcp_up("127.0.0.1:8200");
 
     (declin_web_status, declin_discord_status, samba_status, minidlna_status)
 }
