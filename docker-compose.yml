@@ -4,6 +4,7 @@ services:
     container_name: dashboard-server
     restart: unless-stopped
     network_mode: host
+    pid: host
     env_file:
       - .env
     environment:

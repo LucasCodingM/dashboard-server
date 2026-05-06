@@ -9,12 +9,12 @@ const cpuData = {
     datasets: [{
         label: 'CPU %',
         data: [],
-        borderColor: '#60a5fa',
-        backgroundColor: 'rgba(96,165,250,0.12)',
+        borderColor: '#00f3ff',
+        backgroundColor: 'rgba(0, 243, 255, 0.05)',
         borderWidth: 2,
         fill: true,
         pointRadius: 0,
-        tension: 0.3
+        tension: 0.2
     }]
 };
 
@@ -23,22 +23,22 @@ const ramData = {
     datasets: [{
         label: 'RAM %',
         data: [],
-        borderColor: '#a78bfa',
-        backgroundColor: 'rgba(167,139,250,0.12)',
+        borderColor: '#bc13fe',
+        backgroundColor: 'rgba(188, 19, 254, 0.05)',
         borderWidth: 2,
         fill: true,
         pointRadius: 0,
-        tension: 0.3
+        tension: 0.2
     }]
 };
 
 function getChartColors() {
     const dark = document.documentElement.getAttribute('data-theme') === 'dark';
     return {
-        cpu:  { line: dark ? '#60a5fa' : '#3b82f6', fill: dark ? 'rgba(96,165,250,0.12)'  : 'rgba(59,130,246,0.12)'  },
-        ram:  { line: dark ? '#a78bfa' : '#8b5cf6', fill: dark ? 'rgba(167,139,250,0.12)' : 'rgba(139,92,246,0.12)'  },
-        grid: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-        tick: dark ? '#94a3b8' : '#9ca3af',
+        cpu:  { line: dark ? '#00f3ff' : '#00b4d8', fill: dark ? 'rgba(0, 243, 255, 0.05)' : 'rgba(0, 180, 216, 0.05)' },
+        ram:  { line: dark ? '#bc13fe' : '#5a189a', fill: dark ? 'rgba(188, 19, 254, 0.05)' : 'rgba(90, 24, 154, 0.05)' },
+        grid: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+        tick: dark ? '#666666' : '#888888',
     };
 }
 
@@ -49,14 +49,22 @@ function makeChartOptions(colors) {
         animation: false,
         plugins: {
             legend: { display: false },
-            tooltip: { mode: 'index', intersect: false }
+            tooltip: { 
+                mode: 'index', 
+                intersect: false,
+                backgroundColor: '#000',
+                titleFont: { family: 'Fira Code' },
+                bodyFont: { family: 'Fira Code' },
+                borderColor: '#222',
+                borderWidth: 1
+            }
         },
         scales: {
             y: {
                 beginAtZero: true,
                 max: 100,
                 grid: { color: colors.grid },
-                ticks: { color: colors.tick, font: { size: 10 }, callback: v => v + '%' }
+                ticks: { color: colors.tick, font: { size: 10, family: 'Fira Code' }, callback: v => v + '%' }
             },
             x: {
                 grid: { display: false },
@@ -132,7 +140,6 @@ function updateCharts() {
     if (cpuEl) pushPoint(cpuData, parseFloat(cpuEl.innerText));
     if (ramEl) pushPoint(ramData, parseFloat(ramEl.innerText));
 
-    // Reuse existing chart instances if canvases are preserved
     const cpuCtx = document.getElementById('cpuChart');
     const ramCtx = document.getElementById('ramChart');
 
@@ -149,6 +156,14 @@ function updateCharts() {
         initCharts();
     }
 }
+
+// Add loading state to switches on click
+document.addEventListener('click', function(e) {
+    const switchEl = e.target.closest('.switch');
+    if (switchEl && e.target.tagName === 'INPUT') {
+        switchEl.classList.add('loading');
+    }
+});
 
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     if (evt.detail.target.id === 'dashboard') {

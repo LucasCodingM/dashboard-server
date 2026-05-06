@@ -15,6 +15,8 @@ pub struct DashboardTemplate {
     pub used_memory: String,
     pub memory_percentage: u32,
     pub disks: Vec<DiskInfo>,
+    pub top_cpu: Vec<ProcessInfo>,
+    pub top_mem: Vec<ProcessInfo>,
     pub declin_web_status: bool,
     pub declin_discord_status: bool,
     pub samba_status: bool,
@@ -29,6 +31,13 @@ pub struct DiskInfo {
     pub total: String,
     pub used: String,
     pub percentage: u32,
+}
+
+pub struct ProcessInfo {
+    pub name: String,
+    pub memory: String,
+    pub cpu: String,
+    pub memory_pct: String,
 }
 
 impl IntoResponse for DashboardTemplate {

@@ -10,7 +10,7 @@ use sysinfo::{System, Components, Disks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
 use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION};
-use crate::templates::{DashboardTemplate, DiskInfo};
+use crate::templates::{DashboardTemplate, DiskInfo, ProcessInfo};
 use crate::auth::check_auth;
 
 
@@ -59,6 +59,8 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let (cpu_usage, cpu_model, cpu_temp, cpu_temp_val) = get_cpu_info(&sys, &components);
     let (total_memory, used_memory, memory_percentage) = get_memory_info(&sys);
     let disks_info = get_disks_info(&disks);
+    let top_cpu = get_top_cpu_processes(&sys);
+    let top_mem = get_top_mem_processes(&sys);
     let (declin_web_status, declin_discord_status, samba_status, minidlna_status) = get_services_status(&sys);
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
@@ -76,6 +78,8 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         used_memory,
         memory_percentage,
         disks: disks_info,
+        top_cpu,
+        top_mem,
         declin_web_status,
         declin_discord_status,
         samba_status,
@@ -84,6 +88,41 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         server_power,
         uptime_str,
     }
+}
+
+fn get_top_cpu_processes(sys: &System) -> Vec<ProcessInfo> {
+    let mut processes: Vec<_> = sys.processes().values().collect();
+    processes.sort_by(|a, b| b.cpu_usage().partial_cmp(&a.cpu_usage()).unwrap_or(std::cmp::Ordering::Equal));
+
+    let total_mem = sys.total_memory() as f64;
+
+    processes.iter().take(5).map(|p| {
+        let mem_pct = if total_mem > 0.0 { (p.memory() as f64 / total_mem) * 100.0 } else { 0.0 };
+        ProcessInfo {
+            name: p.name().to_string_lossy().to_string(),
+            memory: utils::human_readable_bytes(p.memory()),
+            cpu: format!("{:.1}%", p.cpu_usage()),
+            memory_pct: format!("{:.1}%", mem_pct),
+        }
+    }).collect()
+}
+
+fn get_top_mem_processes(sys: &System) -> Vec<ProcessInfo> {
+    let mut processes: Vec<_> = sys.processes().values().collect();
+    processes.sort_by_key(|p| p.memory());
+    processes.reverse();
+
+    let total_mem = sys.total_memory() as f64;
+
+    processes.iter().take(5).map(|p| {
+        let mem_pct = if total_mem > 0.0 { (p.memory() as f64 / total_mem) * 100.0 } else { 0.0 };
+        ProcessInfo {
+            name: p.name().to_string_lossy().to_string(),
+            memory: utils::human_readable_bytes(p.memory()),
+            cpu: format!("{:.1}%", p.cpu_usage()),
+            memory_pct: format!("{:.1}%", mem_pct),
+        }
+    }).collect()
 }
 
 fn format_uptime(secs: u64) -> String {
