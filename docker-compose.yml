@@ -14,8 +14,8 @@ services:
       # Docker daemon host (contrôle des services)
       - /var/run/docker.sock:/var/run/docker.sock
       # Sources des projets pour docker compose
-      - ../declin-discord:/declin-discord
-      - ../declin-web:/declin-web
+      - ${DECLIN_DISCORD_PATH:-../declin-discord}:/declin-discord
+      - ${DECLIN_WEB_PATH:-../declin-web}:/declin-web
       # Disques de stockage physiques (rw pour les téléchargements)
       - /stockage:/stockage
     privileged: true

@@ -271,7 +271,8 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
 
     if service == "declin-web" {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-        let path = format!("{}/izeria/declin-web", home);
+        let path = std::env::var("DECLIN_WEB_PATH")
+            .unwrap_or_else(|_| format!("{}/izeria/declin-web", home));
         let args: &[&str] = match action.as_str() {
             "start" => &["compose", "--profile", "mt5", "up", "-d", "--build"],
             "stop"  => &["compose", "--profile", "mt5", "down"],
