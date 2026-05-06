@@ -220,9 +220,23 @@ function sortContainers(key) {
 function parseVal(val, key) {
     if (key === 'status') return parseInt(val);
     if (key === 'name') return val.toLowerCase();
-    // For CPU, MEM, NET - extract numbers
-    const match = val.match(/([0-9.]+)/);
-    return match ? parseFloat(match[1]) : 0;
+    
+    // Extract the number
+    const numMatch = val.match(/([0-9.]+)/);
+    if (!numMatch) return 0;
+    let num = parseFloat(numMatch[1]);
+    
+    // Extract the unit (the part immediately following the number)
+    const unitMatch = val.match(/[0-9.]+\s*([a-zA-Z%]+)/);
+    if (unitMatch) {
+        const unit = unitMatch[1].toLowerCase();
+        if (unit.includes('k')) num *= 1024;
+        else if (unit.includes('m')) num *= 1024 * 1024;
+        else if (unit.includes('g')) num *= 1024 * 1024 * 1024;
+        else if (unit.includes('t')) num *= 1024 * 1024 * 1024 * 1024;
+    }
+    
+    return num;
 }
 
 function applySort() {
