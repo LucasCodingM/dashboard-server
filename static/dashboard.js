@@ -2,7 +2,7 @@
 
 const MAX_POINTS = 300; // 5-minute window
 
-let cpuChart, ramChart;
+let cpuChart, ramChart, netChart;
 
 const cpuData = {
     labels: [],
@@ -32,17 +32,45 @@ const ramData = {
     }]
 };
 
+const netData = {
+    labels: [],
+    datasets: [
+        {
+            label: 'RX (Down)',
+            data: [],
+            borderColor: '#39ff14',
+            backgroundColor: 'rgba(57, 255, 20, 0.05)',
+            borderWidth: 1.5,
+            fill: true,
+            pointRadius: 0,
+            tension: 0.3
+        },
+        {
+            label: 'TX (Up)',
+            data: [],
+            borderColor: '#00f3ff',
+            backgroundColor: 'rgba(0, 243, 255, 0.05)',
+            borderWidth: 1.5,
+            fill: true,
+            pointRadius: 0,
+            tension: 0.3
+        }
+    ]
+};
+
 function getChartColors() {
     const dark = document.documentElement.getAttribute('data-theme') === 'dark';
     return {
         cpu:  { line: dark ? '#00f3ff' : '#00b4d8', fill: dark ? 'rgba(0, 243, 255, 0.05)' : 'rgba(0, 180, 216, 0.05)' },
         ram:  { line: dark ? '#bc13fe' : '#5a189a', fill: dark ? 'rgba(188, 19, 254, 0.05)' : 'rgba(90, 24, 154, 0.05)' },
+        net_rx: { line: '#39ff14', fill: 'rgba(57, 255, 20, 0.05)' },
+        net_tx: { line: '#00f3ff', fill: 'rgba(0, 243, 255, 0.05)' },
         grid: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
         tick: dark ? '#666666' : '#888888',
     };
 }
 
-function makeChartOptions(colors) {
+function makeChartOptions(colors, isNet = false) {
     return {
         responsive: true,
         maintainAspectRatio: false,
@@ -62,9 +90,13 @@ function makeChartOptions(colors) {
         scales: {
             y: {
                 beginAtZero: true,
-                max: 100,
+                max: isNet ? undefined : 100,
                 grid: { color: colors.grid },
-                ticks: { color: colors.tick, font: { size: 10, family: 'Fira Code' }, callback: v => v + '%' }
+                ticks: { 
+                    color: colors.tick, 
+                    font: { size: 10, family: 'Fira Code' }, 
+                    callback: v => isNet ? formatBytes(v) : v + '%' 
+                }
             },
             x: {
                 grid: { display: false },
@@ -72,6 +104,14 @@ function makeChartOptions(colors) {
             }
         }
     };
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 function initCharts() {
@@ -100,61 +140,61 @@ function initCharts() {
             options: makeChartOptions(colors)
         });
     }
+
+    const netCtx = document.getElementById('netChart');
+    if (netCtx) {
+        if (netChart) netChart.destroy();
+        netChart = new Chart(netCtx.getContext('2d'), {
+            type: 'line',
+            data: netData,
+            options: makeChartOptions(colors, true)
+        });
+    }
 }
 
 function updateChartTheme(theme) {
     const colors = getChartColors();
-
-    if (cpuChart) {
-        cpuChart.data.datasets[0].borderColor = colors.cpu.line;
-        cpuChart.data.datasets[0].backgroundColor = colors.cpu.fill;
-        cpuChart.options.scales.y.grid.color = colors.grid;
-        cpuChart.options.scales.y.ticks.color = colors.tick;
-        cpuChart.update('none');
-    }
-
-    if (ramChart) {
-        ramChart.data.datasets[0].borderColor = colors.ram.line;
-        ramChart.data.datasets[0].backgroundColor = colors.ram.fill;
-        ramChart.options.scales.y.grid.color = colors.grid;
-        ramChart.options.scales.y.ticks.color = colors.tick;
-        ramChart.update('none');
+    [cpuChart, ramChart].forEach(chart => {
+        if (chart) {
+            chart.options.scales.y.grid.color = colors.grid;
+            chart.options.scales.y.ticks.color = colors.tick;
+            chart.update('none');
+        }
+    });
+    if (netChart) {
+        netChart.options.scales.y.grid.color = colors.grid;
+        netChart.options.scales.y.ticks.color = colors.tick;
+        netChart.update('none');
     }
 }
 
 initCharts();
 
-function pushPoint(chartDataset, value) {
-    chartDataset.labels.push('');
-    chartDataset.datasets[0].data.push(value);
+function pushPoint(chartDataset, value, index = 0) {
+    if (index === 0) chartDataset.labels.push('');
+    chartDataset.datasets[index].data.push(value);
     if (chartDataset.labels.length > MAX_POINTS) {
-        chartDataset.labels.shift();
-        chartDataset.datasets[0].data.shift();
+        if (index === 0) chartDataset.labels.shift();
+        chartDataset.datasets[index].data.shift();
     }
 }
 
 function updateCharts() {
     const cpuEl = document.getElementById('cpu-value');
     const ramEl = document.getElementById('ram-value');
+    const rxEl = document.getElementById('rx-raw');
+    const txEl = document.getElementById('tx-raw');
 
     if (cpuEl) pushPoint(cpuData, parseFloat(cpuEl.innerText));
     if (ramEl) pushPoint(ramData, parseFloat(ramEl.innerText));
-
-    const cpuCtx = document.getElementById('cpuChart');
-    const ramCtx = document.getElementById('ramChart');
-
-    if (cpuChart && cpuCtx && cpuChart.canvas === cpuCtx) {
-        cpuChart.update('none');
-    } else {
-        initCharts();
-        return;
+    if (rxEl && txEl) {
+        pushPoint(netData, parseFloat(rxEl.innerText), 0);
+        pushPoint(netData, parseFloat(txEl.innerText), 1);
     }
 
-    if (ramChart && ramCtx && ramChart.canvas === ramCtx) {
-        ramChart.update('none');
-    } else {
-        initCharts();
-    }
+    [cpuChart, ramChart, netChart].forEach(chart => {
+        if (chart) chart.update('none');
+    });
 }
 
 // Add loading state to switches on click

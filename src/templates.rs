@@ -17,6 +17,8 @@ pub struct DashboardTemplate {
     pub disks: Vec<DiskInfo>,
     pub top_cpu: Vec<ProcessInfo>,
     pub top_mem: Vec<ProcessInfo>,
+    pub network: NetworkInfo,
+    pub containers: Vec<ContainerInfo>,
     pub declin_web_status: bool,
     pub declin_discord_status: bool,
     pub samba_status: bool,
@@ -24,6 +26,19 @@ pub struct DashboardTemplate {
     pub is_authenticated: bool,
     pub server_power: String,
     pub uptime_str: String,
+}
+
+pub struct NetworkInfo {
+    pub rx_speed: String,
+    pub tx_speed: String,
+    pub rx_val: u64,
+    pub tx_val: u64,
+}
+
+pub struct ContainerInfo {
+    pub name: String,
+    pub status: String,
+    pub is_running: bool,
 }
 
 pub struct DiskInfo {

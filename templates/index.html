@@ -125,6 +125,32 @@
                         </div>
                     </div>
 
+                    <!-- Network Card -->
+                    <div class="card network-card">
+                        <h3>NET_TRAFFIC</h3>
+                        <div class="network-stats">
+                            <div class="net-stat">
+                                <div class="net-stat-label">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neon-cyan);"><path d="M12 19V5"/><polyline points="5 12 12 5 19 12"/></svg>
+                                    UPLOAD
+                                </div>
+                                <div class="net-stat-value" id="tx-value">{{ network.tx_speed }}</div>
+                            </div>
+                            <div class="net-stat">
+                                <div class="net-stat-label">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neon-green);"><path d="M12 5v14"/><polyline points="19 12 12 19 5 12"/></svg>
+                                    DOWNLOAD
+                                </div>
+                                <div class="net-stat-value" id="rx-value">{{ network.rx_speed }}</div>
+                            </div>
+                        </div>
+                        <div class="chart-container chart-container--sm">
+                            <canvas id="netChart" hx-preserve></canvas>
+                        </div>
+                        <div style="display:none;" id="rx-raw">{{ network.rx_val }}</div>
+                        <div style="display:none;" id="tx-raw">{{ network.tx_val }}</div>
+                    </div>
+
                     <!-- System Card -->
                     <div class="card system-card">
                         <h3>CORE_STATS</h3>
@@ -148,6 +174,23 @@
                                     <div class="stat-sub">UPTIME</div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Docker Containers Card -->
+                    <div class="card containers-card">
+                        <h3>DOCKER_CONTAINERS</h3>
+                        <div class="container-list">
+                            {% for container in containers %}
+                            <div class="container-item">
+                                <div class="container-main">
+                                    <span class="container-name">{{ container.name }}</span>
+                                    <span class="status-badge {% if container.is_running %}badge-running{% else %}badge-stopped{% endif %}" style="margin: 0;">
+                                        {{ container.status }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
 

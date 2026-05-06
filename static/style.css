@@ -195,9 +195,11 @@ body {
 .ram-card      { grid-column: 2;     grid-row: 1; }
 .top-cpu-card  { grid-column: 1;     grid-row: 2; }
 .top-mem-card  { grid-column: 2;     grid-row: 2; }
-.system-card   { grid-column: 1 / 3; grid-row: 3; }
-.services-card { grid-column: 3;     grid-row: 1 / 4; }
-.disks-card    { grid-column: 1 / -1; grid-row: 4; }
+.network-card  { grid-column: 1;     grid-row: 3; }
+.system-card   { grid-column: 2;     grid-row: 3; }
+.containers-card { grid-column: 1 / 3; grid-row: 4; }
+.services-card { grid-column: 3;     grid-row: 1 / 5; }
+.disks-card    { grid-column: 1 / -1; grid-row: 5; }
 
 @media (max-width: 1200px) {
     .admin-grid { grid-template-columns: 1fr 1fr; }
@@ -205,9 +207,68 @@ body {
     .ram-card      { grid-column: 2;     grid-row: 1; }
     .top-cpu-card  { grid-column: 1;     grid-row: 2; }
     .top-mem-card  { grid-column: 2;     grid-row: 2; }
-    .system-card   { grid-column: 1 / -1; grid-row: 3; }
-    .services-card { grid-column: 1 / -1; grid-row: 4; }
-    .disks-card    { grid-column: 1 / -1; grid-row: 5; }
+    .network-card  { grid-column: 1;     grid-row: 3; }
+    .system-card   { grid-column: 2;     grid-row: 3; }
+    .containers-card { grid-column: 1 / -1; grid-row: 4; }
+    .services-card { grid-column: 1 / -1; grid-row: 5; }
+    .disks-card    { grid-column: 1 / -1; grid-row: 6; }
+}
+...
+/* ===================== Network Card ===================== */
+.network-stats {
+    display: flex;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.net-stat {
+    flex: 1;
+}
+
+.net-stat-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.net-stat-value {
+    font-size: 1.2rem;
+    font-weight: 800;
+    font-family: 'Fira Code', monospace;
+}
+
+/* ===================== Containers Card ===================== */
+.container-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.container-item {
+    background: var(--bg-secondary);
+    padding: 10px 14px;
+    border-left: 2px solid var(--accent);
+}
+
+.container-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.container-name {
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 @media (max-width: 800px) {

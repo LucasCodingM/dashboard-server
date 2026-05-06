@@ -6,11 +6,11 @@ use axum::{
 use std::net::TcpStream;
 use std::process::Command;
 use std::time::Duration;
-use sysinfo::{System, Components, Disks};
+use sysinfo::{System, Components, Disks, Networks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
-use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION};
-use crate::templates::{DashboardTemplate, DiskInfo, ProcessInfo};
+use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION, NET_DATA, NETWORKS};
+use crate::templates::{DashboardTemplate, DiskInfo, ProcessInfo, NetworkInfo, ContainerInfo};
 use crate::auth::check_auth;
 
 
@@ -61,6 +61,8 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let disks_info = get_disks_info(&disks);
     let top_cpu = get_top_cpu_processes(&sys);
     let top_mem = get_top_mem_processes(&sys);
+    let network = get_network_info();
+    let containers = get_docker_containers();
     let (declin_web_status, declin_discord_status, samba_status, minidlna_status) = get_services_status(&sys);
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
@@ -80,6 +82,8 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         disks: disks_info,
         top_cpu,
         top_mem,
+        network,
+        containers,
         declin_web_status,
         declin_discord_status,
         samba_status,
@@ -87,6 +91,56 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         is_authenticated,
         server_power,
         uptime_str,
+    }
+}
+
+fn get_network_info() -> NetworkInfo {
+    let mut networks = NETWORKS.lock().unwrap();
+    networks.refresh(true);
+    
+    let mut current_rx = 0;
+    let mut current_tx = 0;
+
+    for (_, data) in networks.iter() {
+        current_rx += data.received();
+        current_tx += data.transmitted();
+    }
+
+    let mut last_data = NET_DATA.lock().unwrap();
+    let rx_speed = if current_rx >= last_data.0 { current_rx - last_data.0 } else { 0 };
+    let tx_speed = if current_tx >= last_data.1 { current_tx - last_data.1 } else { 0 };
+    
+    *last_data = (current_rx, current_tx);
+
+    NetworkInfo {
+        rx_speed: format!("{}/s", utils::human_readable_bytes(rx_speed)),
+        tx_speed: format!("{}/s", utils::human_readable_bytes(tx_speed)),
+        rx_val: rx_speed,
+        tx_val: tx_speed,
+    }
+}
+
+fn get_docker_containers() -> Vec<ContainerInfo> {
+    let output = Command::new("docker")
+        .args(["ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.State}}"])
+        .output();
+
+    match output {
+        Ok(o) => {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|line| !line.is_empty())
+                .map(|line| {
+                    let parts: Vec<&str> = line.split('|').collect();
+                    ContainerInfo {
+                        name: parts.get(0).unwrap_or(&"unknown").to_string(),
+                        status: parts.get(1).unwrap_or(&"unknown").to_string(),
+                        is_running: parts.get(2).map(|&s| s == "running").unwrap_or(false),
+                    }
+                })
+                .collect()
+        }
+        Err(_) => Vec::new(),
     }
 }
 
