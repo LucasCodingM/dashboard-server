@@ -205,8 +205,46 @@ document.addEventListener('click', function(e) {
     }
 });
 
+let currentSort = { key: 'name', asc: true };
+
+function sortContainers(key) {
+    if (currentSort.key === key) {
+        currentSort.asc = !currentSort.asc;
+    } else {
+        currentSort.key = key;
+        currentSort.asc = true;
+    }
+    applySort();
+}
+
+function parseVal(val, key) {
+    if (key === 'status') return parseInt(val);
+    if (key === 'name') return val.toLowerCase();
+    // For CPU, MEM, NET - extract numbers
+    const match = val.match(/([0-9.]+)/);
+    return match ? parseFloat(match[1]) : 0;
+}
+
+function applySort() {
+    const list = document.getElementById('container-list');
+    if (!list) return;
+    const items = Array.from(list.children);
+    
+    items.sort((a, b) => {
+        const valA = parseVal(a.getAttribute(`data-${currentSort.key}`), currentSort.key);
+        const valB = parseVal(b.getAttribute(`data-${currentSort.key}`), currentSort.key);
+        
+        if (valA < valB) return currentSort.asc ? -1 : 1;
+        if (valA > valB) return currentSort.asc ? 1 : -1;
+        return 0;
+    });
+
+    items.forEach(item => list.appendChild(item));
+}
+
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     if (evt.detail.target.id === 'dashboard') {
         updateCharts();
+        applySort(); // Re-apply sort after HTMX update
     }
 });

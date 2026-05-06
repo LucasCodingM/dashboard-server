@@ -51,33 +51,6 @@
             <div class="admin-grid">
                 <div id="dashboard">
 
-                    <!-- Docker Containers Card (Top Priority) -->
-                    <div class="card containers-card">
-                        <h3>DOCKER_ENGINE // ACTIVE_CONTAINERS</h3>
-                        <div class="container-grid-header">
-                            <span>NAME</span>
-                            <span>STATUS</span>
-                            <span>CPU</span>
-                            <span>MEM</span>
-                            <span>NET_IO</span>
-                        </div>
-                        <div class="container-list">
-                            {% for container in containers %}
-                            <div class="container-item">
-                                <div class="container-main">
-                                    <span class="container-name" title="{{ container.name }}">{{ container.name }}</span>
-                                    <span class="status-badge {% if container.is_running %}badge-running{% else %}badge-stopped{% endif %}" style="margin: 0; min-width: 80px; text-align: center;">
-                                        {% if container.is_running %}UP{% else %}DOWN{% endif %}
-                                    </span>
-                                    <span class="container-stat proc-cpu">{{ container.cpu }}</span>
-                                    <span class="container-stat proc-mem" style="font-size: 0.75rem;">{{ container.memory }}</span>
-                                    <span class="container-stat" style="font-size: 0.7rem; color: var(--text-muted);">{{ container.net_io }}</span>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
                     <!-- Unified CPU Card -->
                     <div class="card cpu-card">
                         <div class="card-header-flex">
@@ -150,28 +123,38 @@
                         </div>
                     </div>
 
-                    <!-- Storage nodes (remains at bottom) -->
-                    <div class="card disks-card">
-                        <h3>STORAGE_NODES</h3>
-                        <div class="disk-grid">
-                            {% for disk in disks %}
-                            <div class="disk-item">
-                                <div class="disk-label">
-                                    <span class="disk-name">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle; color: var(--neon-cyan);"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-                                        {{ disk.name }}
+                    <!-- Docker Containers Card -->
+                    <div class="card containers-card">
+                        <h3>DOCKER_ENGINE // ACTIVE_CONTAINERS</h3>
+                        <div class="container-grid-header">
+                            <span class="sort-header" onclick="sortContainers('name')">NAME ↕</span>
+                            <span class="sort-header" onclick="sortContainers('status')">STATUS ↕</span>
+                            <span class="sort-header" onclick="sortContainers('cpu')">CPU ↕</span>
+                            <span class="sort-header" onclick="sortContainers('mem')">MEM ↕</span>
+                            <span class="sort-header" onclick="sortContainers('net')">NET_IO ↕</span>
+                        </div>
+                        <div class="container-list" id="container-list">
+                            {% for container in containers %}
+                            <div class="container-item" 
+                                 data-name="{{ container.name }}" 
+                                 data-status="{% if container.is_running %}1{% else %}0{% endif %}"
+                                 data-cpu="{{ container.cpu }}"
+                                 data-mem="{{ container.memory }}"
+                                 data-net="{{ container.net_io }}">
+                                <div class="container-main">
+                                    <span class="container-name" title="{{ container.name }}">{{ container.name }}</span>
+                                    <span class="status-badge {% if container.is_running %}badge-running{% else %}badge-stopped{% endif %}" style="margin: 0; min-width: 80px; text-align: center;">
+                                        {% if container.is_running %}UP{% else %}DOWN{% endif %}
                                     </span>
-                                    <span class="disk-pct {% if disk.percentage > 85 %}disk-pct-hot{% elif disk.percentage > 65 %}disk-pct-warn{% endif %}">{{ disk.percentage }}%</span>
+                                    <span class="container-stat proc-cpu">{{ container.cpu }}</span>
+                                    <span class="container-stat proc-mem" style="font-size: 0.75rem;">{{ container.memory }}</span>
+                                    <span class="container-stat" style="font-size: 0.7rem; color: var(--text-muted);">{{ container.net_io }}</span>
                                 </div>
-                                <div class="bar-container">
-                                    <div class="bar {% if disk.percentage > 85 %}bar-danger{% elif disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%"></div>
-                                </div>
-                                <div class="disk-sizes">{{ disk.used }} / {{ disk.total }}</div>
                             </div>
                             {% endfor %}
                         </div>
                     </div>
-
+                    
                     <!-- Network & Stats Column -->
                     <div class="card network-card">
                         <h3>NET_TRAFFIC</h3>
@@ -198,146 +181,150 @@
                         <div style="display:none;" id="tx-raw">{{ network.tx_val }}</div>
                     </div>
 
-                    <div class="card system-card">
-                        <h3>CORE_STATS</h3>
-                        <div class="system-stats">
-                            <div class="system-stat">
-                                <div class="system-stat-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f59e0b;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <!-- Sidebar Column (Services + System Stats) -->
+                    <div class="sidebar-column">
+                        <!-- Services Card -->
+                        <div class="card services-card">
+                            <h3>MANAGED_SERVICES</h3>
+                            <div class="service-row">
+                                <div class="service-info">
+                                    <span class="service-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                    </span>
+                                    <div>
+                                        <div class="service-name">declin-web</div>
+                                        <span class="status-badge {% if declin_web_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                            {% if declin_web_status %}ACTIVE{% else %}INACTIVE{% endif %}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div class="system-stat-value">{{ server_power }}</div>
-                                    <div class="stat-sub">PWR_CONS</div>
-                                </div>
+                                {% if is_authenticated %}
+                                    <label class="switch">
+                                        <input type="checkbox" {% if declin_web_status %}checked{% endif %}
+                                            hx-post="/service/declin-web/{% if declin_web_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                        <span class="slider"></span>
+                                    </label>
+                                {% else %}
+                                    <div class="led {% if declin_web_status %}led-green{% else %}led-red{% endif %}"></div>
+                                {% endif %}
                             </div>
-                            <div class="system-divider"></div>
-                            <div class="system-stat">
-                                <div class="system-stat-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neon-cyan);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+
+                            <div class="service-row">
+                                <div class="service-info">
+                                    <span class="service-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                                    </span>
+                                    <div>
+                                        <div class="service-name">declin-discord</div>
+                                        <span class="status-badge {% if declin_discord_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                            {% if declin_discord_status %}ACTIVE{% else %}INACTIVE{% endif %}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div class="system-stat-value">{{ uptime_str }}</div>
-                                    <div class="stat-sub">UPTIME</div>
+                                {% if is_authenticated %}
+                                    <label class="switch">
+                                        <input type="checkbox" {% if declin_discord_status %}checked{% endif %}
+                                            hx-post="/service/declin-discord/{% if declin_discord_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                        <span class="slider"></span>
+                                    </label>
+                                {% else %}
+                                    <div class="led {% if declin_discord_status %}led-green{% else %}led-red{% endif %}"></div>
+                                {% endif %}
+                            </div>
+
+                            <div class="service-row">
+                                <div class="service-info">
+                                    <span class="service-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                                    </span>
+                                    <div>
+                                        <div class="service-name">Samba</div>
+                                        <span class="status-badge {% if samba_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                            {% if samba_status %}ACTIVE{% else %}INACTIVE{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                {% if is_authenticated %}
+                                    <label class="switch">
+                                        <input type="checkbox" {% if samba_status %}checked{% endif %}
+                                            hx-post="/service/samba/{% if samba_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                        <span class="slider"></span>
+                                    </label>
+                                {% else %}
+                                    <div class="led {% if samba_status %}led-green{% else %}led-red{% endif %}"></div>
+                                {% endif %}
+                            </div>
+
+                            <div class="service-row">
+                                <div class="service-info">
+                                    <span class="service-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                    </span>
+                                    <div>
+                                        <div class="service-name">MiniDLNA</div>
+                                        <span class="status-badge {% if minidlna_status %}badge-running{% else %}badge-stopped{% endif %}">
+                                            {% if minidlna_status %}ACTIVE{% else %}INACTIVE{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                {% if is_authenticated %}
+                                    <label class="switch">
+                                        <input type="checkbox" {% if minidlna_status %}checked{% endif %}
+                                            hx-post="/service/minidlna/{% if minidlna_status %}stop{% else %}start{% endif %}" hx-swap="none">
+                                        <span class="slider"></span>
+                                    </label>
+                                {% else %}
+                                    <div class="led {% if minidlna_status %}led-green{% else %}led-red{% endif %}"></div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- System Stats Card -->
+                        <div class="card system-card">
+                            <h3>CORE_STATS</h3>
+                            <div class="system-stats">
+                                <div class="system-stat">
+                                    <div class="system-stat-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #f59e0b;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                    </div>
+                                    <div>
+                                        <div class="system-stat-value">{{ server_power }}</div>
+                                        <div class="stat-sub">PWR_CONS</div>
+                                    </div>
+                                </div>
+                                <div class="system-divider"></div>
+                                <div class="system-stat">
+                                    <div class="system-stat-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--neon-cyan);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    </div>
+                                    <div>
+                                        <div class="system-stat-value">{{ uptime_str }}</div>
+                                        <div class="stat-sub">UPTIME</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Services Card -->
-                    <div class="card services-card">
-                        <h3>MANAGED_SERVICES</h3>
-                        <div class="service-row">
-                            <div class="service-info">
-                                <span class="service-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                                </span>
-                                <div>
-                                    <div class="service-name">declin-web</div>
-                                    <span class="status-badge {% if declin_web_status %}badge-running{% else %}badge-stopped{% endif %}">
-                                        {% if declin_web_status %}ACTIVE{% else %}INACTIVE{% endif %}
-                                    </span>
+                        <!-- Disks Card -->
+                        <div class="card disks-card">
+                            <h3>STORAGE_NODES</h3>
+                            <div class="disk-grid-sidebar">
+                                {% for disk in disks %}
+                                <div class="disk-item">
+                                    <div class="disk-label">
+                                        <span class="disk-name">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle; color: var(--neon-cyan);"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                                            {{ disk.name }}
+                                        </span>
+                                        <span class="disk-pct {% if disk.percentage > 85 %}disk-pct-hot{% elif disk.percentage > 65 %}disk-pct-warn{% endif %}">{{ disk.percentage }}%</span>
+                                    </div>
+                                    <div class="bar-container">
+                                        <div class="bar {% if disk.percentage > 85 %}bar-danger{% elif disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%"></div>
+                                    </div>
+                                    <div class="disk-sizes">{{ disk.used }} / {{ disk.total }}</div>
                                 </div>
+                                {% endfor %}
                             </div>
-                            {% if is_authenticated %}
-                                <label class="switch">
-                                    <input type="checkbox" {% if declin_web_status %}checked{% endif %}
-                                        hx-post="/service/declin-web/{% if declin_web_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                    <span class="slider"></span>
-                                </label>
-                            {% else %}
-                                <div class="led {% if declin_web_status %}led-green{% else %}led-red{% endif %}"></div>
-                            {% endif %}
-                        </div>
-
-                        <div class="service-row">
-                            <div class="service-info">
-                                <span class="service-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
-                                </span>
-                                <div>
-                                    <div class="service-name">declin-discord</div>
-                                    <span class="status-badge {% if declin_discord_status %}badge-running{% else %}badge-stopped{% endif %}">
-                                        {% if declin_discord_status %}ACTIVE{% else %}INACTIVE{% endif %}
-                                    </span>
-                                </div>
-                            </div>
-                            {% if is_authenticated %}
-                                <label class="switch">
-                                    <input type="checkbox" {% if declin_discord_status %}checked{% endif %}
-                                        hx-post="/service/declin-discord/{% if declin_discord_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                    <span class="slider"></span>
-                                </label>
-                            {% else %}
-                                <div class="led {% if declin_discord_status %}led-green{% else %}led-red{% endif %}"></div>
-                            {% endif %}
-                        </div>
-
-                        <div class="service-row">
-                            <div class="service-info">
-                                <span class="service-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                                </span>
-                                <div>
-                                    <div class="service-name">Samba</div>
-                                    <span class="status-badge {% if samba_status %}badge-running{% else %}badge-stopped{% endif %}">
-                                        {% if samba_status %}ACTIVE{% else %}INACTIVE{% endif %}
-                                    </span>
-                                </div>
-                            </div>
-                            {% if is_authenticated %}
-                                <label class="switch">
-                                    <input type="checkbox" {% if samba_status %}checked{% endif %}
-                                        hx-post="/service/samba/{% if samba_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                    <span class="slider"></span>
-                                </label>
-                            {% else %}
-                                <div class="led {% if samba_status %}led-green{% else %}led-red{% endif %}"></div>
-                            {% endif %}
-                        </div>
-
-                        <div class="service-row">
-                            <div class="service-info">
-                                <span class="service-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                                </span>
-                                <div>
-                                    <div class="service-name">MiniDLNA</div>
-                                    <span class="status-badge {% if minidlna_status %}badge-running{% else %}badge-stopped{% endif %}">
-                                        {% if minidlna_status %}ACTIVE{% else %}INACTIVE{% endif %}
-                                    </span>
-                                </div>
-                            </div>
-                            {% if is_authenticated %}
-                                <label class="switch">
-                                    <input type="checkbox" {% if minidlna_status %}checked{% endif %}
-                                        hx-post="/service/minidlna/{% if minidlna_status %}stop{% else %}start{% endif %}" hx-swap="none">
-                                    <span class="slider"></span>
-                                </label>
-                            {% else %}
-                                <div class="led {% if minidlna_status %}led-green{% else %}led-red{% endif %}"></div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <!-- Disks Card -->
-                    <div class="card disks-card">
-                        <h3>STORAGE_NODES</h3>
-                        <div class="disk-grid">
-                            {% for disk in disks %}
-                            <div class="disk-item">
-                                <div class="disk-label">
-                                    <span class="disk-name">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle; color: var(--neon-cyan);"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-                                        {{ disk.name }}
-                                    </span>
-                                    <span class="disk-pct {% if disk.percentage > 85 %}disk-pct-hot{% elif disk.percentage > 65 %}disk-pct-warn{% endif %}">{{ disk.percentage }}%</span>
-                                </div>
-                                <div class="bar-container">
-                                    <div class="bar {% if disk.percentage > 85 %}bar-danger{% elif disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%"></div>
-                                </div>
-                                <div class="disk-sizes">{{ disk.used }} / {{ disk.total }}</div>
-                            </div>
-                            {% endfor %}
                         </div>
                     </div>
 

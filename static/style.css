@@ -191,30 +191,40 @@ body {
 
 #dashboard { display: contents; }
 
-.containers-card { grid-column: 1 / 3; grid-row: 1; }
-.cpu-card        { grid-column: 1;     grid-row: 2; }
-.ram-card        { grid-column: 2;     grid-row: 2; }
-.network-card    { grid-column: 1;     grid-row: 3; }
-.system-card     { grid-column: 2;     grid-row: 3; }
-.services-card   { grid-column: 3;     grid-row: 1 / 4; }
-.disks-card      { grid-column: 1 / -1; grid-row: 4; }
+.cpu-card        { grid-column: 1;      grid-row: 1; }
+.ram-card        { grid-column: 2;      grid-row: 1; }
+.containers-card { grid-column: 1 / 3;  grid-row: 2; }
+.network-card    { grid-column: 1 / 3;  grid-row: 3; }
+.sidebar-column  { grid-column: 3;      grid-row: 1 / 4; display: flex; flex-direction: column; gap: 1.5rem; }
 
 @media (max-width: 1400px) {
     .admin-grid { grid-template-columns: 1fr 1fr; }
-    .containers-card { grid-column: 1 / -1; grid-row: 1; }
-    .cpu-card        { grid-column: 1;      grid-row: 2; }
-    .ram-card        { grid-column: 2;      grid-row: 2; }
+    .cpu-card        { grid-column: 1;      grid-row: 1; }
+    .ram-card        { grid-column: 2;      grid-row: 1; }
+    .containers-card { grid-column: 1 / -1; grid-row: 2; }
     .network-card    { grid-column: 1;      grid-row: 3; }
-    .system-card     { grid-column: 2;      grid-row: 3; }
-    .services-card   { grid-column: 1 / -1; grid-row: 4; }
-    .disks-card      { grid-column: 1 / -1; grid-row: 5; }
+    .sidebar-column  { grid-column: 2;      grid-row: 3; }
 }
 
 @media (max-width: 850px) {
     .admin-grid { grid-template-columns: 1fr; }
-    .containers-card, .cpu-card, .ram-card, .network-card, .system-card, .services-card, .disks-card {
+    .cpu-card, .ram-card, .containers-card, .network-card, .sidebar-column {
         grid-column: 1; grid-row: auto;
     }
+}
+...
+.mini-table-header {
+...
+}
+
+.sort-header {
+    cursor: pointer;
+    transition: color 0.2s;
+    user-select: none;
+}
+
+.sort-header:hover {
+    color: var(--accent);
 }
 
 /* ===================== Unified Cards Helpers ===================== */
@@ -342,12 +352,6 @@ body {
     .container-stat { display: none; }
 }
 
-@media (max-width: 800px) {
-    .admin-grid { grid-template-columns: 1fr; }
-    .cpu-card, .ram-card, .top-cpu-card, .top-mem-card, .system-card, .services-card, .disks-card {
-        grid-column: 1; grid-row: auto;
-    }
-}
 ...
 /* ===================== Disk List ===================== */
 .disk-grid {
@@ -569,6 +573,12 @@ body {
 .disk-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.5rem;
+}
+
+.disk-grid-sidebar {
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
 }
 
