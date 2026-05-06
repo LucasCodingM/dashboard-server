@@ -39,6 +39,10 @@ pub struct ContainerInfo {
     pub name: String,
     pub status: String,
     pub is_running: bool,
+    pub cpu: String,
+    pub memory: String,
+    pub net_io: String,
+    pub block_io: String,
 }
 
 pub struct DiskInfo {

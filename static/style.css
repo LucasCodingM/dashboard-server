@@ -191,27 +191,64 @@ body {
 
 #dashboard { display: contents; }
 
-.cpu-card      { grid-column: 1;     grid-row: 1; }
-.ram-card      { grid-column: 2;     grid-row: 1; }
-.top-cpu-card  { grid-column: 1;     grid-row: 2; }
-.top-mem-card  { grid-column: 2;     grid-row: 2; }
-.network-card  { grid-column: 1;     grid-row: 3; }
-.system-card   { grid-column: 2;     grid-row: 3; }
-.containers-card { grid-column: 1 / 3; grid-row: 4; }
-.services-card { grid-column: 3;     grid-row: 1 / 5; }
-.disks-card    { grid-column: 1 / -1; grid-row: 5; }
+.containers-card { grid-column: 1 / 3; grid-row: 1; }
+.cpu-card        { grid-column: 1;     grid-row: 2; }
+.ram-card        { grid-column: 2;     grid-row: 2; }
+.network-card    { grid-column: 1;     grid-row: 3; }
+.system-card     { grid-column: 2;     grid-row: 3; }
+.services-card   { grid-column: 3;     grid-row: 1 / 4; }
+.disks-card      { grid-column: 1 / -1; grid-row: 4; }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
     .admin-grid { grid-template-columns: 1fr 1fr; }
-    .cpu-card      { grid-column: 1;     grid-row: 1; }
-    .ram-card      { grid-column: 2;     grid-row: 1; }
-    .top-cpu-card  { grid-column: 1;     grid-row: 2; }
-    .top-mem-card  { grid-column: 2;     grid-row: 2; }
-    .network-card  { grid-column: 1;     grid-row: 3; }
-    .system-card   { grid-column: 2;     grid-row: 3; }
-    .containers-card { grid-column: 1 / -1; grid-row: 4; }
-    .services-card { grid-column: 1 / -1; grid-row: 5; }
-    .disks-card    { grid-column: 1 / -1; grid-row: 6; }
+    .containers-card { grid-column: 1 / -1; grid-row: 1; }
+    .cpu-card        { grid-column: 1;      grid-row: 2; }
+    .ram-card        { grid-column: 2;      grid-row: 2; }
+    .network-card    { grid-column: 1;      grid-row: 3; }
+    .system-card     { grid-column: 2;      grid-row: 3; }
+    .services-card   { grid-column: 1 / -1; grid-row: 4; }
+    .disks-card      { grid-column: 1 / -1; grid-row: 5; }
+}
+
+@media (max-width: 850px) {
+    .admin-grid { grid-template-columns: 1fr; }
+    .containers-card, .cpu-card, .ram-card, .network-card, .system-card, .services-card, .disks-card {
+        grid-column: 1; grid-row: auto;
+    }
+}
+
+/* ===================== Unified Cards Helpers ===================== */
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.mini-table-header {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: var(--text-light);
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.process-item.mini {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    background: var(--bg-secondary);
+    margin-bottom: 4px;
+}
+
+.process-item.mini .proc-name {
+    font-size: 0.75rem;
+}
+
+.chart-container--xs {
+    height: 80px;
+    margin-top: 1rem;
 }
 ...
 /* ===================== Network Card ===================== */
@@ -243,21 +280,41 @@ body {
 }
 
 /* ===================== Containers Card ===================== */
-.container-list {
+.container-grid-header {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: 1fr 100px 80px 140px 140px;
     gap: 10px;
+    padding: 0 14px 10px 14px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+}
+
+.container-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .container-item {
     background: var(--bg-secondary);
     padding: 10px 14px;
     border-left: 2px solid var(--accent);
+    transition: transform 0.2s;
+}
+
+.container-item:hover {
+    transform: translateX(4px);
+    background: var(--tab-hover);
 }
 
 .container-main {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 100px 80px 140px 140px;
     align-items: center;
     gap: 10px;
 }
@@ -269,6 +326,20 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.container-stat {
+    font-family: 'Fira Code', monospace;
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .container-grid-header { display: none; }
+    .container-main {
+        grid-template-columns: 1fr 100px;
+        grid-template-rows: auto auto;
+    }
+    .container-stat { display: none; }
 }
 
 @media (max-width: 800px) {

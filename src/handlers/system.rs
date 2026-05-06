@@ -121,21 +121,57 @@ fn get_network_info() -> NetworkInfo {
 }
 
 fn get_docker_containers() -> Vec<ContainerInfo> {
+    // We use docker stats with --no-stream to get a single snapshot
+    // and custom formatting to match our struct
     let output = Command::new("docker")
+        .args([
+            "stats",
+            "--no-stream",
+            "--format",
+            "{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.NetIO}}|{{.BlockIO}}"
+        ])
+        .output();
+
+    let mut stats_map = HashMap::new();
+    if let Ok(o) = output {
+        for line in String::from_utf8_lossy(&o.stdout).lines() {
+            let parts: Vec<&str> = line.split('|').collect();
+            if parts.len() == 5 {
+                stats_map.insert(parts[0].to_string(), (
+                    parts[1].to_string(),
+                    parts[2].to_string(),
+                    parts[3].to_string(),
+                    parts[4].to_string(),
+                ));
+            }
+        }
+    }
+
+    // Now get the statuses (running/stopped)
+    let ps_output = Command::new("docker")
         .args(["ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.State}}"])
         .output();
 
-    match output {
+    match ps_output {
         Ok(o) => {
             String::from_utf8_lossy(&o.stdout)
                 .lines()
                 .filter(|line| !line.is_empty())
                 .map(|line| {
                     let parts: Vec<&str> = line.split('|').collect();
+                    let name = parts.get(0).unwrap_or(&"unknown").to_string();
+                    let (cpu, mem, net, block) = stats_map.get(&name)
+                        .cloned()
+                        .unwrap_or(("--".into(), "-- / --".into(), "-- / --".into(), "-- / --".into()));
+
                     ContainerInfo {
-                        name: parts.get(0).unwrap_or(&"unknown").to_string(),
+                        name,
                         status: parts.get(1).unwrap_or(&"unknown").to_string(),
                         is_running: parts.get(2).map(|&s| s == "running").unwrap_or(false),
+                        cpu,
+                        memory: mem,
+                        net_io: net,
+                        block_io: block,
                     }
                 })
                 .collect()

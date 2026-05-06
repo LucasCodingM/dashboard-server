@@ -51,54 +51,58 @@
             <div class="admin-grid">
                 <div id="dashboard">
 
-                    <!-- CPU Card -->
-                    <div class="card cpu-card">
-                        <h3>CPU_LOAD</h3>
-                        <div class="stat-row">
-                            <div>
-                                <div class="stat-value">
-                                    <span id="cpu-value">{{ cpu_usage }}</span><span class="stat-unit">%</span>
+                    <!-- Docker Containers Card (Top Priority) -->
+                    <div class="card containers-card">
+                        <h3>DOCKER_ENGINE // ACTIVE_CONTAINERS</h3>
+                        <div class="container-grid-header">
+                            <span>NAME</span>
+                            <span>STATUS</span>
+                            <span>CPU</span>
+                            <span>MEM</span>
+                            <span>NET_IO</span>
+                        </div>
+                        <div class="container-list">
+                            {% for container in containers %}
+                            <div class="container-item">
+                                <div class="container-main">
+                                    <span class="container-name" title="{{ container.name }}">{{ container.name }}</span>
+                                    <span class="status-badge {% if container.is_running %}badge-running{% else %}badge-stopped{% endif %}" style="margin: 0; min-width: 80px; text-align: center;">
+                                        {% if container.is_running %}UP{% else %}DOWN{% endif %}
+                                    </span>
+                                    <span class="container-stat proc-cpu">{{ container.cpu }}</span>
+                                    <span class="container-stat proc-mem" style="font-size: 0.75rem;">{{ container.memory }}</span>
+                                    <span class="container-stat" style="font-size: 0.7rem; color: var(--text-muted);">{{ container.net_io }}</span>
                                 </div>
-                                <div class="stat-sub">{{ cpu_model }}</div>
                             </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Unified CPU Card -->
+                    <div class="card cpu-card">
+                        <div class="card-header-flex">
+                            <h3>CPU_CORE // METRICS</h3>
                             <span class="temp-badge {% if cpu_temp_val < 50.0 %}temp-ok{% elif cpu_temp_val < 80.0 %}temp-warn{% else %}temp-hot{% endif %}">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
                                 {{ cpu_temp }}
                             </span>
                         </div>
-                        <div class="bar-container">
+                        
+                        <div class="stat-row" style="margin-bottom: 0.5rem;">
+                            <div class="stat-value">
+                                <span id="cpu-value">{{ cpu_usage }}</span><span class="stat-unit">%</span>
+                            </div>
+                            <div class="stat-sub">{{ cpu_model }}</div>
+                        </div>
+
+                        <div class="bar-container" style="margin-bottom: 1.5rem;">
                             <div class="bar {% if cpu_usage > 80 %}bar-danger{% elif cpu_usage > 60 %}bar-warn{% endif %}" style="width: {{ cpu_usage }}%"></div>
                         </div>
-                        <div class="chart-container">
-                            <canvas id="cpuChart" hx-preserve></canvas>
-                        </div>
-                    </div>
 
-                    <!-- RAM Card -->
-                    <div class="card ram-card">
-                        <h3>MEM_USAGE</h3>
-                        <div class="stat-row">
-                            <div>
-                                <div class="stat-value">
-                                    <span id="ram-value">{{ memory_percentage }}</span><span class="stat-unit">%</span>
-                                </div>
-                                <div class="stat-sub">{{ used_memory }} / {{ total_memory }}</div>
-                            </div>
-                        </div>
-                        <div class="bar-container">
-                            <div class="bar {% if memory_percentage > 85 %}bar-danger{% elif memory_percentage > 65 %}bar-warn{% endif %}" style="width: {{ memory_percentage }}%"></div>
-                        </div>
-                        <div class="chart-container chart-container--sm">
-                            <canvas id="ramChart" hx-preserve></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Top CPU Processes -->
-                    <div class="card top-cpu-card">
-                        <h3>TOP_CPU_TASKS</h3>
-                        <div class="process-list">
+                        <div class="mini-table-header">TOP_CPU_PROCESSES</div>
+                        <div class="process-list" style="margin-bottom: 1.5rem;">
                             {% for proc in top_cpu %}
-                            <div class="process-item">
+                            <div class="process-item mini">
                                 <span class="proc-name">{{ proc.name }}</span>
                                 <div class="proc-stats">
                                     <span class="proc-cpu">{{ proc.cpu }}</span>
@@ -107,14 +111,31 @@
                             </div>
                             {% endfor %}
                         </div>
+
+                        <div class="chart-container chart-container--xs">
+                            <canvas id="cpuChart" hx-preserve></canvas>
+                        </div>
                     </div>
 
-                    <!-- Top Memory Processes -->
-                    <div class="card top-mem-card">
-                        <h3>TOP_MEM_TASKS</h3>
-                        <div class="process-list">
+                    <!-- Unified RAM Card -->
+                    <div class="card ram-card">
+                        <h3>MEM_POOL // METRICS</h3>
+                        
+                        <div class="stat-row" style="margin-bottom: 0.5rem;">
+                            <div class="stat-value">
+                                <span id="ram-value">{{ memory_percentage }}</span><span class="stat-unit">%</span>
+                            </div>
+                            <div class="stat-sub">{{ used_memory }} / {{ total_memory }}</div>
+                        </div>
+
+                        <div class="bar-container" style="margin-bottom: 1.5rem;">
+                            <div class="bar {% if memory_percentage > 85 %}bar-danger{% elif memory_percentage > 65 %}bar-warn{% endif %}" style="width: {{ memory_percentage }}%"></div>
+                        </div>
+
+                        <div class="mini-table-header">TOP_MEM_PROCESSES</div>
+                        <div class="process-list" style="margin-bottom: 1.5rem;">
                             {% for proc in top_mem %}
-                            <div class="process-item">
+                            <div class="process-item mini">
                                 <span class="proc-name">{{ proc.name }}</span>
                                 <div class="proc-stats">
                                     <span class="proc-cpu" style="color: var(--neon-purple);">{{ proc.memory_pct }}</span>
@@ -123,9 +144,35 @@
                             </div>
                             {% endfor %}
                         </div>
+
+                        <div class="chart-container chart-container--xs">
+                            <canvas id="ramChart" hx-preserve></canvas>
+                        </div>
                     </div>
 
-                    <!-- Network Card -->
+                    <!-- Storage nodes (remains at bottom) -->
+                    <div class="card disks-card">
+                        <h3>STORAGE_NODES</h3>
+                        <div class="disk-grid">
+                            {% for disk in disks %}
+                            <div class="disk-item">
+                                <div class="disk-label">
+                                    <span class="disk-name">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: middle; color: var(--neon-cyan);"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                                        {{ disk.name }}
+                                    </span>
+                                    <span class="disk-pct {% if disk.percentage > 85 %}disk-pct-hot{% elif disk.percentage > 65 %}disk-pct-warn{% endif %}">{{ disk.percentage }}%</span>
+                                </div>
+                                <div class="bar-container">
+                                    <div class="bar {% if disk.percentage > 85 %}bar-danger{% elif disk.percentage > 65 %}bar-warn{% endif %}" style="width: {{ disk.percentage }}%"></div>
+                                </div>
+                                <div class="disk-sizes">{{ disk.used }} / {{ disk.total }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Network & Stats Column -->
                     <div class="card network-card">
                         <h3>NET_TRAFFIC</h3>
                         <div class="network-stats">
@@ -151,7 +198,6 @@
                         <div style="display:none;" id="tx-raw">{{ network.tx_val }}</div>
                     </div>
 
-                    <!-- System Card -->
                     <div class="card system-card">
                         <h3>CORE_STATS</h3>
                         <div class="system-stats">
@@ -177,27 +223,9 @@
                         </div>
                     </div>
 
-                    <!-- Docker Containers Card -->
-                    <div class="card containers-card">
-                        <h3>DOCKER_CONTAINERS</h3>
-                        <div class="container-list">
-                            {% for container in containers %}
-                            <div class="container-item">
-                                <div class="container-main">
-                                    <span class="container-name">{{ container.name }}</span>
-                                    <span class="status-badge {% if container.is_running %}badge-running{% else %}badge-stopped{% endif %}" style="margin: 0;">
-                                        {{ container.status }}
-                                    </span>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-
                     <!-- Services Card -->
                     <div class="card services-card">
-                        <h3>ACTIVE_SERVICES</h3>
-
+                        <h3>MANAGED_SERVICES</h3>
                         <div class="service-row">
                             <div class="service-info">
                                 <span class="service-icon">
