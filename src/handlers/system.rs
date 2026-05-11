@@ -63,7 +63,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let top_mem = get_top_mem_processes(&sys);
     let network = get_network_info();
     let containers = get_docker_containers();
-    let (declin_web_status, declin_discord_status, samba_status, minidlna_status) = get_services_status(&sys);
+    let (declin_web_status, declin_discord_status, trading_status, samba_status, minidlna_status) = get_services_status(&sys);
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
     let server_power = format!("{:.2} W", power_val);
@@ -86,6 +86,7 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         containers,
         declin_web_status,
         declin_discord_status,
+        trading_status,
         samba_status,
         minidlna_status,
         is_authenticated,
@@ -361,13 +362,22 @@ fn check_declin_web_status(container_name: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn get_services_status(_sys: &System) -> (bool, bool, bool, bool) {
+fn check_trading_status() -> bool {
+    Command::new("docker")
+        .args(["inspect", "declin-discord", "--format", "{{range .Config.Env}}{{println .}}{{end}}"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).lines().any(|l| l == "ENABLE_TRADING=true"))
+        .unwrap_or(false)
+}
+
+fn get_services_status(_sys: &System) -> (bool, bool, bool, bool, bool) {
     let declin_web_status = check_declin_web_status("declin-web");
     let declin_discord_status = check_declin_web_status("declin-discord");
+    let trading_status = check_trading_status();
     let samba_status    = tcp_up("127.0.0.1:445");
     let minidlna_status = tcp_up("127.0.0.1:8200");
 
-    (declin_web_status, declin_discord_status, samba_status, minidlna_status)
+    (declin_web_status, declin_discord_status, trading_status, samba_status, minidlna_status)
 }
 
 pub async fn service_handler(Path((service, action)): Path<(String, String)>, headers: HeaderMap) -> impl IntoResponse {
@@ -380,8 +390,10 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
         let compose_dir = std::env::var("DECLIN_DISCORD_PATH")
             .unwrap_or_else(|_| format!("{}/izeria/declin-discord", home));
         let args: &[&str] = match action.as_str() {
-            "start" => &["compose", "-f", "docker-compose.yml", "up", "-d", "--build"],
-            "stop"  => &["compose", "-f", "docker-compose.yml", "down"],
+            "start"          => &["compose", "-f", "docker-compose.yml", "up", "-d", "--build"],
+            "stop"           => &["compose", "-f", "docker-compose.yml", "down"],
+            "trading-enable" => &["compose", "-f", "docker-compose.yml", "-f", "docker-compose.trading.yml", "up", "-d", "--force-recreate"],
+            "trading-disable"=> &["compose", "-f", "docker-compose.yml", "up", "-d", "--force-recreate"],
             _ => return (StatusCode::BAD_REQUEST, "Invalid action").into_response(),
         };
         return match Command::new("docker").args(args).current_dir(&compose_dir).status() {
