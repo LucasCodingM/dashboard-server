@@ -380,8 +380,8 @@ pub async fn service_handler(Path((service, action)): Path<(String, String)>, he
         let compose_dir = std::env::var("DECLIN_DISCORD_PATH")
             .unwrap_or_else(|_| format!("{}/izeria/declin-discord", home));
         let args: &[&str] = match action.as_str() {
-            "start" => &["compose", "-f", "docker-compose.bot.yml", "up", "-d", "--build"],
-            "stop"  => &["compose", "-f", "docker-compose.bot.yml", "down"],
+            "start" => &["compose", "-f", "docker-compose.yml", "up", "-d", "--build"],
+            "stop"  => &["compose", "-f", "docker-compose.yml", "down"],
             _ => return (StatusCode::BAD_REQUEST, "Invalid action").into_response(),
         };
         return match Command::new("docker").args(args).current_dir(&compose_dir).status() {
