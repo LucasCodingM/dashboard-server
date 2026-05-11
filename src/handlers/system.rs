@@ -9,7 +9,7 @@ use std::time::Duration;
 use sysinfo::{System, Components, Disks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
-use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION, NET_DATA, NETWORKS};
+use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION, NET_DATA, NETWORKS, DOCKER_CACHE, SERVICE_CACHE, CachedContainerInfo, CachedServiceStatus};
 use crate::templates::{DashboardTemplate, DiskInfo, ProcessInfo, NetworkInfo, ContainerInfo};
 use crate::auth::check_auth;
 
@@ -46,6 +46,18 @@ pub async fn reboot_handler(headers: HeaderMap) -> impl IntoResponse {
 }
 
 
+pub fn start_docker_polling() {
+    std::thread::spawn(|| loop {
+        let containers = poll_docker_containers();
+        *DOCKER_CACHE.lock().unwrap() = containers;
+
+        let status = poll_service_status();
+        *SERVICE_CACHE.lock().unwrap() = status;
+
+        std::thread::sleep(Duration::from_secs(5));
+    });
+}
+
 pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
     let mut sys = SYS.lock().unwrap();
     sys.refresh_all();
@@ -55,15 +67,28 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
 
     let mut disks = DISKS.lock().unwrap();
     disks.refresh(true);
-    
+
     let (cpu_usage, cpu_model, cpu_temp, cpu_temp_val) = get_cpu_info(&sys, &components);
     let (total_memory, used_memory, memory_percentage) = get_memory_info(&sys);
     let disks_info = get_disks_info(&disks);
     let top_cpu = get_top_cpu_processes(&sys);
     let top_mem = get_top_mem_processes(&sys);
     let network = get_network_info();
-    let containers = get_docker_containers();
-    let (declin_web_status, declin_discord_status, trading_status, samba_status, minidlna_status) = get_services_status(&sys);
+
+    let containers = {
+        let cache = DOCKER_CACHE.lock().unwrap();
+        cache.iter().map(|c| ContainerInfo {
+            name: c.name.clone(),
+            is_running: c.is_running,
+            cpu: c.cpu.clone(),
+            memory: c.memory.clone(),
+            net_io: c.net_io.clone(),
+        }).collect::<Vec<_>>()
+    };
+    let (declin_web_status, declin_discord_status, trading_status, samba_status, minidlna_status) = {
+        let s = SERVICE_CACHE.lock().unwrap();
+        (s.declin_web, s.declin_discord, s.trading, s.samba, s.minidlna)
+    };
 
     let power_val = *POWER_CONSUMPTION.lock().unwrap();
     let server_power = format!("{:.2} W", power_val);
@@ -121,9 +146,7 @@ fn get_network_info() -> NetworkInfo {
     }
 }
 
-fn get_docker_containers() -> Vec<ContainerInfo> {
-    // We use docker stats with --no-stream to get a single snapshot
-    // and custom formatting to match our struct
+fn poll_docker_containers() -> Vec<CachedContainerInfo> {
     let output = Command::new("docker")
         .args([
             "stats",
@@ -147,7 +170,6 @@ fn get_docker_containers() -> Vec<ContainerInfo> {
         }
     }
 
-    // Now get the statuses (running/stopped)
     let ps_output = Command::new("docker")
         .args(["ps", "-a", "--format", "{{.Names}}|{{.State}}"])
         .output();
@@ -164,7 +186,7 @@ fn get_docker_containers() -> Vec<ContainerInfo> {
                         .cloned()
                         .unwrap_or(("--".into(), "-- / --".into(), "-- / --".into()));
 
-                    ContainerInfo {
+                    CachedContainerInfo {
                         name,
                         is_running: parts.get(1).map(|&s| s == "running").unwrap_or(false),
                         cpu,
@@ -370,14 +392,14 @@ fn check_trading_status() -> bool {
         .unwrap_or(false)
 }
 
-fn get_services_status(_sys: &System) -> (bool, bool, bool, bool, bool) {
-    let declin_web_status = check_declin_web_status("declin-web");
-    let declin_discord_status = check_declin_web_status("declin-discord");
-    let trading_status = check_trading_status();
-    let samba_status    = tcp_up("127.0.0.1:445");
-    let minidlna_status = tcp_up("127.0.0.1:8200");
-
-    (declin_web_status, declin_discord_status, trading_status, samba_status, minidlna_status)
+fn poll_service_status() -> CachedServiceStatus {
+    CachedServiceStatus {
+        declin_web:     check_declin_web_status("declin-web"),
+        declin_discord: check_declin_web_status("declin-discord"),
+        trading:        check_trading_status(),
+        samba:          tcp_up("127.0.0.1:445"),
+        minidlna:       tcp_up("127.0.0.1:8200"),
+    }
 }
 
 pub async fn service_handler(Path((service, action)): Path<(String, String)>, headers: HeaderMap) -> impl IntoResponse {

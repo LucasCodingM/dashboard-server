@@ -54,6 +54,7 @@ async fn main() {
     dotenv::dotenv().ok();
 
     monitor_consumption();
+    system::start_docker_polling();
 
     let app = Router::new()
         .route("/", get(system::dashboard_handler))
