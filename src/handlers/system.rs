@@ -6,7 +6,7 @@ use axum::{
 use std::net::TcpStream;
 use std::process::Command;
 use std::time::Duration;
-use sysinfo::{System, Components, Disks, Networks};
+use sysinfo::{System, Components, Disks};
 use std::collections::{HashMap, HashSet};
 use crate::utils;
 use crate::state::{SYS, COMPONENTS, DISKS, POWER_CONSUMPTION, NET_DATA, NETWORKS};
@@ -128,7 +128,7 @@ fn get_docker_containers() -> Vec<ContainerInfo> {
             "stats",
             "--no-stream",
             "--format",
-            "{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.NetIO}}|{{.BlockIO}}"
+            "{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.NetIO}}"
         ])
         .output();
 
@@ -136,12 +136,11 @@ fn get_docker_containers() -> Vec<ContainerInfo> {
     if let Ok(o) = output {
         for line in String::from_utf8_lossy(&o.stdout).lines() {
             let parts: Vec<&str> = line.split('|').collect();
-            if parts.len() == 5 {
+            if parts.len() == 4 {
                 stats_map.insert(parts[0].to_string(), (
                     parts[1].to_string(),
                     parts[2].to_string(),
                     parts[3].to_string(),
-                    parts[4].to_string(),
                 ));
             }
         }
@@ -149,7 +148,7 @@ fn get_docker_containers() -> Vec<ContainerInfo> {
 
     // Now get the statuses (running/stopped)
     let ps_output = Command::new("docker")
-        .args(["ps", "-a", "--format", "{{.Names}}|{{.Status}}|{{.State}}"])
+        .args(["ps", "-a", "--format", "{{.Names}}|{{.State}}"])
         .output();
 
     match ps_output {
@@ -160,18 +159,16 @@ fn get_docker_containers() -> Vec<ContainerInfo> {
                 .map(|line| {
                     let parts: Vec<&str> = line.split('|').collect();
                     let name = parts.get(0).unwrap_or(&"unknown").to_string();
-                    let (cpu, mem, net, block) = stats_map.get(&name)
+                    let (cpu, mem, net) = stats_map.get(&name)
                         .cloned()
-                        .unwrap_or(("--".into(), "-- / --".into(), "-- / --".into(), "-- / --".into()));
+                        .unwrap_or(("--".into(), "-- / --".into(), "-- / --".into()));
 
                     ContainerInfo {
                         name,
-                        status: parts.get(1).unwrap_or(&"unknown").to_string(),
-                        is_running: parts.get(2).map(|&s| s == "running").unwrap_or(false),
+                        is_running: parts.get(1).map(|&s| s == "running").unwrap_or(false),
                         cpu,
                         memory: mem,
                         net_io: net,
-                        block_io: block,
                     }
                 })
                 .collect()
@@ -356,21 +353,17 @@ fn tcp_up(addr: &str) -> bool {
     TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_millis(300)).is_ok()
 }
 
-fn check_declin_web_status() -> bool {
+fn check_declin_web_status(container_name: &str) -> bool {
     Command::new("docker")
-        .args(["inspect", "--format={{.State.Running}}", "declin-web"])
+        .args(["inspect", "--format={{.State.Running}}", container_name])
         .output()
         .map(|o| o.stdout.starts_with(b"true"))
         .unwrap_or(false)
 }
 
 fn get_services_status(_sys: &System) -> (bool, bool, bool, bool) {
-    let declin_web_status = check_declin_web_status();
-    let declin_discord_status = Command::new("docker")
-        .args(["inspect", "--format={{.State.Running}}", "declin-discord-bot"])
-        .output()
-        .map(|o| o.stdout.starts_with(b"true"))
-        .unwrap_or(false);
+    let declin_web_status = check_declin_web_status("declin-web");
+    let declin_discord_status = check_declin_web_status("declin-discord");
     let samba_status    = tcp_up("127.0.0.1:445");
     let minidlna_status = tcp_up("127.0.0.1:8200");
 
