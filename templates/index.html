@@ -219,6 +219,18 @@
                                         <span class="status-badge {% if declin_discord_status %}badge-running{% else %}badge-stopped{% endif %}">
                                             {% if declin_discord_status %}ACTIVE{% else %}INACTIVE{% endif %}
                                         </span>
+                                        <div style="display:flex; align-items:center; gap:8px; margin-top:6px; opacity: {% if declin_discord_status %}1{% else %}0.35{% endif %};">
+                                            <span style="font-size:0.65rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted);">Trading</span>
+                                            {% if is_authenticated %}
+                                                <label class="switch" style="transform:scale(0.75); transform-origin:left center;">
+                                                    <input type="checkbox" {% if trading_status %}checked{% endif %}
+                                                        hx-post="/service/declin-discord/{% if trading_status %}trading-disable{% else %}trading-enable{% endif %}" hx-swap="none">
+                                                    <span class="slider"></span>
+                                                </label>
+                                            {% else %}
+                                                <div class="led {% if trading_status %}led-green{% else %}led-red{% endif %}"></div>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                                 {% if is_authenticated %}
@@ -229,25 +241,6 @@
                                     </label>
                                 {% else %}
                                     <div class="led {% if declin_discord_status %}led-green{% else %}led-red{% endif %}"></div>
-                                {% endif %}
-                            </div>
-                            <div class="service-row" style="padding-left: 2.5rem; opacity: {% if declin_discord_status %}1{% else %}0.4{% endif %};">
-                                <div class="service-info">
-                                    <div>
-                                        <div class="service-name" style="font-size: 0.75rem; color: var(--text-muted);">Trading</div>
-                                        <span class="status-badge {% if trading_status %}badge-running{% else %}badge-stopped{% endif %}" style="font-size: 0.65rem;">
-                                            {% if trading_status %}ON{% else %}OFF{% endif %}
-                                        </span>
-                                    </div>
-                                </div>
-                                {% if is_authenticated %}
-                                    <label class="switch">
-                                        <input type="checkbox" {% if trading_status %}checked{% endif %}
-                                            hx-post="/service/declin-discord/{% if trading_status %}trading-disable{% else %}trading-enable{% endif %}" hx-swap="none">
-                                        <span class="slider"></span>
-                                    </label>
-                                {% else %}
-                                    <div class="led {% if trading_status %}led-green{% else %}led-red{% endif %}"></div>
                                 {% endif %}
                             </div>
 
