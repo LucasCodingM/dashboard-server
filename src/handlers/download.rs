@@ -15,8 +15,38 @@ use tokio_stream::StreamExt;
 use crate::state::DOWNLOAD_STATE;
 use crate::auth::check_auth;
 
+fn deserialize_string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct StringOrVec;
+
+    impl<'de> serde::de::Visitor<'de> for StringOrVec {
+        type Value = Vec<String>;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("string or sequence of strings")
+        }
+
+        fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+            Ok(vec![v.to_owned()])
+        }
+
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+            let mut v = Vec::new();
+            while let Some(s) = seq.next_element()? {
+                v.push(s);
+            }
+            Ok(v)
+        }
+    }
+
+    deserializer.deserialize_any(StringOrVec)
+}
+
 #[derive(Deserialize)]
 pub struct DownloadRequest {
+    #[serde(deserialize_with = "deserialize_string_or_vec")]
     url: Vec<String>,
     category: String,
     custom_path: Option<String>,
@@ -78,6 +108,7 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
             let mut cmd = if use_ytdlp {
                 let mut c = Command::new("yt-dlp");
                 c.arg("--newline").arg("--no-colors");
+                c.arg("--merge-output-format").arg("mp4");
                 c.arg("-o").arg(format!("{}/%(title)s.%(ext)s", target_dir_clone));
                 c.arg(&url);
                 c
