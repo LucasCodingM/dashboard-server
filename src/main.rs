@@ -65,6 +65,7 @@ async fn main() {
         .route("/reboot", post(system::reboot_handler))
         .route("/download", post(download::download_handler))
         .route("/download/stop", post(download::stop_download_handler))
+        .route("/download/clear", post(download::clear_completed_handler))
         .route("/download/logs", get(download::get_download_logs))
         // Serves files from the "static" directory at the "/static" URL path
         .nest_service("/static", ServeDir::new("static"));

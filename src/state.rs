@@ -2,11 +2,34 @@ use std::sync::Mutex;
 use sysinfo::{System, Components, Disks, Networks};
 use lazy_static::lazy_static;
 
-pub struct DownloadState {
+pub struct DownloadTask {
+    pub id: u32,
+    pub url: String,
     pub is_running: bool,
     pub logs: Vec<String>,
     pub child_pid: Option<u32>,
     pub target_dir: Option<String>,
+}
+
+pub struct DownloadState {
+    pub tasks: Vec<DownloadTask>,
+    pub next_id: u32,
+}
+
+impl DownloadState {
+    pub fn add_task(&mut self, url: String, target_dir: String) -> u32 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.tasks.push(DownloadTask {
+            id,
+            url,
+            is_running: true,
+            logs: Vec::new(),
+            child_pid: None,
+            target_dir: Some(target_dir),
+        });
+        id
+    }
 }
 
 pub struct CachedContainerInfo {
@@ -31,10 +54,8 @@ lazy_static! {
     pub static ref DISKS: Mutex<Disks> = Mutex::new(Disks::new_with_refreshed_list());
     pub static ref NETWORKS: Mutex<Networks> = Mutex::new(Networks::new_with_refreshed_list());
     pub static ref DOWNLOAD_STATE: Mutex<DownloadState> = Mutex::new(DownloadState {
-        is_running: false,
-        logs: Vec::new(),
-        child_pid: None,
-        target_dir: None,
+        tasks: Vec::new(),
+        next_id: 0,
     });
     pub static ref POWER_CONSUMPTION: Mutex<f32> = Mutex::new(0.0);
     pub static ref NET_DATA: Mutex<(u64, u64)> = Mutex::new((0, 0));

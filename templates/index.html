@@ -351,8 +351,8 @@
                 {% if is_authenticated %}
                 <form hx-post="/download" hx-swap="innerHTML" hx-target="#download-response">
                     <div style="margin-bottom: 1.5rem;">
-                        <label class="form-label">TARGET_URL</label>
-                        <input type="text" name="url" placeholder="https://..." required class="form-input">
+                        <label class="form-label">TARGET_URL <span style="font-size:0.8em;color:var(--text-muted);">(une URL par ligne)</span></label>
+                        <textarea name="url" placeholder="https://..." required class="form-input" rows="4" style="resize:vertical;font-family:monospace;font-size:0.9em;"></textarea>
                     </div>
                     <div style="margin-bottom: 2rem;">
                         <label class="form-label">ALLOCATION_PATH</label>
