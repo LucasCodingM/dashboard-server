@@ -349,22 +349,32 @@
             <div class="downloader-form">
                 <h2>DATA_ACQUISITION</h2>
                 {% if is_authenticated %}
-                <form hx-post="/download" hx-swap="innerHTML" hx-target="#download-response">
+                <form hx-post="/download" hx-swap="beforeend" hx-target="#download-tasks">
                     <div style="margin-bottom: 1.5rem;">
-                        <label class="form-label">TARGET_URL <span style="font-size:0.8em;color:var(--text-muted);">(une URL par ligne)</span></label>
-                        <textarea name="url" placeholder="https://..." required class="form-input" rows="4" style="resize:vertical;font-family:monospace;font-size:0.9em;"></textarea>
+                        <label class="form-label">TARGET_URL</label>
+                        <div id="url-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+                            <div class="url-row" style="display:flex;gap:8px;">
+                                <input type="text" name="url" placeholder="https://..." class="form-input" style="flex:1;margin-bottom:0;">
+                            </div>
+                        </div>
+                        <button type="button" onclick="addUrlRow()" class="btn-primary" style="font-size:0.85em;padding:4px 14px;">+ Ajouter URL</button>
                     </div>
                     <div style="margin-bottom: 2rem;">
                         <label class="form-label">ALLOCATION_PATH</label>
-                        <select name="category" class="form-select">
-                            <option value="video">VIDEO [/stockage/videos]</option>
-                            <option value="film">FILM [/stockage/videos/films]</option>
-                            <option value="other">MISC [/stockage/telechargements]</option>
+                        <select name="category" class="form-select" onchange="toggleCustomPath(this)">
+                            <option value="video">VIDEO [{{ path_video }}]</option>
+                            <option value="film">FILM [{{ path_film }}]</option>
+                            <option value="other">MISC [{{ path_download }}]</option>
+                            <option value="custom">CUSTOM [chemin manuel]</option>
                         </select>
+                        <div id="custom-path-row" style="display:none;margin-top:8px;gap:8px;align-items:center;">
+                            <input type="text" name="custom_path" id="custom-path-input" placeholder="/mon/chemin/custom" class="form-input" style="flex:1;margin-bottom:0;font-family:monospace;">
+                            <button type="button" onclick="openFileBrowser()" class="btn-primary" style="flex-shrink:0;padding:6px 14px;white-space:nowrap;">Parcourir</button>
+                        </div>
                     </div>
                     <button type="submit" class="btn-primary">BEGIN_FETCH</button>
                 </form>
-                <div id="download-response" style="margin-top: 1.5rem;"></div>
+                <div id="download-tasks" style="margin-top:1.5rem;"></div>
                 {% else %}
                 <p style="color: var(--text-muted); font-family: monospace;">AUTH_REQUIRED: Access denied.</p>
                 {% endif %}
@@ -376,6 +386,56 @@
 
     <script src="/static/dashboard.js?v=7"></script>
     <script>
+        function toggleCustomPath(select) {
+            const row = document.getElementById('custom-path-row');
+            const input = document.getElementById('custom-path-input');
+            const isCustom = select.value === 'custom';
+            row.style.display = isCustom ? 'flex' : 'none';
+            input.required = isCustom;
+        }
+
+        function initTaskSSE(taskId) {
+            const logDiv = document.getElementById('task-log-' + taskId);
+            const badge = document.getElementById('task-badge-' + taskId);
+            const stopBtn = document.getElementById('task-stop-' + taskId);
+            if (!logDiv) return;
+
+            const es = new EventSource('/download/logs/' + taskId + '/stream');
+
+            es.addEventListener('log', function(e) {
+                const atBottom = logDiv.scrollHeight - logDiv.scrollTop <= logDiv.clientHeight + 40;
+                logDiv.insertAdjacentText('beforeend', e.data + '\n');
+                if (atBottom) logDiv.scrollTop = logDiv.scrollHeight;
+            });
+
+            es.addEventListener('done', function() {
+                if (badge) { badge.textContent = '[TERMINÉ]'; badge.style.color = '#888'; }
+                if (stopBtn) stopBtn.style.display = 'none';
+                es.close();
+            });
+
+            es.onerror = function() { es.close(); };
+        }
+
+        function clearDoneTasks() {
+            document.querySelectorAll('.task-card').forEach(function(card) {
+                const badge = card.querySelector('[id^="task-badge-"]');
+                if (badge && badge.textContent.includes('TERMINÉ')) card.remove();
+            });
+            // Sync state côté serveur
+            fetch('/download/clear', { method: 'POST' });
+        }
+
+        function addUrlRow() {
+            const list = document.getElementById('url-list');
+            const row = document.createElement('div');
+            row.className = 'url-row';
+            row.style.cssText = 'display:flex;gap:8px;';
+            row.innerHTML = '<input type="text" name="url" placeholder="https://..." class="form-input" style="flex:1;margin-bottom:0;"><button type="button" onclick="this.parentElement.remove()" class="btn-shutdown" style="flex-shrink:0;padding:6px 12px;background:#555;">×</button>';
+            list.appendChild(row);
+            row.querySelector('input').focus();
+        }
+
         function openTab(evt, tabName) {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active'));
@@ -401,6 +461,51 @@
             const current = html.getAttribute('data-theme');
             applyTheme(current === 'dark' ? 'light' : 'dark');
         });
+    </script>
+
+    <!-- File browser modal -->
+    <div id="fb-overlay" onclick="closeFileBrowser()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:900;"></div>
+    <div id="fb-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#111;border:1px solid #444;border-radius:8px;z-index:901;width:520px;max-width:90vw;flex-direction:column;max-height:70vh;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #333;">
+            <span style="font-family:monospace;font-weight:bold;font-size:0.95em;">EXPLORATEUR</span>
+            <button onclick="closeFileBrowser()" style="background:none;border:none;color:#ccc;font-size:1.2em;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div style="padding:8px 16px;border-bottom:1px solid #222;font-family:monospace;font-size:0.82em;color:#888;word-break:break-all;" id="fb-current-path">...</div>
+        <div id="browser-content" style="overflow-y:auto;flex:1;padding:8px;"></div>
+        <div style="padding:12px 16px;border-top:1px solid #333;display:flex;justify-content:flex-end;gap:8px;">
+            <button onclick="closeFileBrowser()" class="btn-shutdown" style="padding:6px 16px;">Annuler</button>
+            <button onclick="selectBrowserPath()" class="btn-primary" style="padding:6px 16px;">Sélectionner</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('htmx:afterSettle', function(e) {
+            if (e.detail.target.id === 'browser-content') {
+                const marker = e.detail.target.querySelector('[data-current-path]');
+                if (marker) document.getElementById('fb-current-path').textContent = marker.dataset.currentPath;
+            }
+        });
+
+        function openFileBrowser() {
+            document.getElementById('fb-overlay').style.display = 'block';
+            const modal = document.getElementById('fb-modal');
+            modal.style.display = 'flex';
+            // Charge le chemin actuel s'il y en a un
+            const currentPath = document.getElementById('custom-path-input').value.trim();
+            const browsePath = currentPath || '';
+            htmx.ajax('GET', '/browse' + (browsePath ? '?path=' + encodeURIComponent(browsePath) : ''), '#browser-content');
+        }
+
+        function closeFileBrowser() {
+            document.getElementById('fb-overlay').style.display = 'none';
+            document.getElementById('fb-modal').style.display = 'none';
+        }
+
+        function selectBrowserPath() {
+            const path = document.getElementById('fb-current-path').textContent.trim();
+            document.getElementById('custom-path-input').value = path;
+            closeFileBrowser();
+        }
     </script>
 </body>
 </html>

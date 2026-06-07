@@ -11,6 +11,10 @@ services:
       - IS_DOCKER=true
       - DECLIN_DISCORD_PATH=/declin-discord
       - DECLIN_WEB_PATH=/declin-web
+      - BROWSE_ROOT=/stockage
+      - VIDEO_PATH=/stockage/videos
+      - MOVIE_PATH=/stockage/videos/films
+      - DOWNLOAD_PATH=/stockage/telechargements
     volumes:
       # Docker daemon host (contrôle des services)
       - /var/run/docker.sock:/var/run/docker.sock

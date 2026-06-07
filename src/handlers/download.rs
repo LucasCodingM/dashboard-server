@@ -1,25 +1,32 @@
 use axum::{
-    extract::Form,
+    extract::{Form, Path},
     http::{StatusCode, HeaderMap},
-    response::{IntoResponse, Html},
+    response::{sse::{Event, Sse, KeepAlive}, IntoResponse, Html},
 };
 use serde::Deserialize;
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
+use std::convert::Infallible;
+use std::time::Duration;
+use futures_util::stream::Stream;
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 
 use crate::state::DOWNLOAD_STATE;
 use crate::auth::check_auth;
 
 #[derive(Deserialize)]
 pub struct DownloadRequest {
-    url: String,
+    url: Vec<String>,
     category: String,
+    custom_path: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct StopRequest {
     task_id: u32,
 }
+
 
 pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRequest>) -> impl IntoResponse {
     if !check_auth(&headers) {
@@ -33,18 +40,24 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
     let target_dir = match payload.category.as_str() {
         "film" => movie_path,
         "video" => video_path,
+        "custom" => payload.custom_path
+            .filter(|p| !p.trim().is_empty())
+            .map(|p| p.trim().to_string())
+            .unwrap_or(download_path),
         _ => download_path,
     };
 
     let urls: Vec<String> = payload.url
-        .lines()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
+        .into_iter()
+        .map(|u| u.trim().to_string())
+        .filter(|u| !u.is_empty())
         .collect();
 
     if urls.is_empty() {
-        return Html("<div style='color: red;'>Aucune URL fournie.</div>").into_response();
+        return Html("<div style='color:red;'>Aucune URL fournie.</div>").into_response();
     }
+
+    let mut task_ids: Vec<u32> = Vec::new();
 
     for url in urls {
         let use_ytdlp = url.contains("youtube.com")
@@ -58,27 +71,23 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
             state.tasks.last_mut().unwrap().logs.push(format!("Download starting : {}", url));
             id
         };
+        task_ids.push(task_id);
 
         let target_dir_clone = target_dir.clone();
         std::thread::spawn(move || {
             let mut cmd = if use_ytdlp {
                 let mut c = Command::new("yt-dlp");
-                c.arg("--newline");
-                c.arg("--no-colors");
-                c.arg("-o");
-                c.arg(format!("{}/%(title)s.%(ext)s", target_dir_clone));
+                c.arg("--newline").arg("--no-colors");
+                c.arg("-o").arg(format!("{}/%(title)s.%(ext)s", target_dir_clone));
                 c.arg(&url);
                 c
             } else {
                 let mut c = Command::new("wget");
-                c.arg("-P");
-                c.arg(&target_dir_clone);
-                c.arg(&url);
+                c.arg("-P").arg(&target_dir_clone).arg(&url);
                 c
             };
 
-            cmd.stdout(Stdio::piped());
-            cmd.stderr(Stdio::piped());
+            cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
             match cmd.spawn() {
                 Ok(mut child) => {
@@ -103,9 +112,6 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
                                         let mut state = DOWNLOAD_STATE.lock().unwrap();
                                         if let Some(task) = state.tasks.iter_mut().find(|t| t.id == task_id) {
                                             task.logs.push(l);
-                                            if task.logs.len() > 200 {
-                                                task.logs.remove(0);
-                                            }
                                         }
                                     }
                                 }
@@ -124,7 +130,7 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
                             task.child_pid = None;
                             match status {
                                 Ok(s) => task.logs.push(format!("Terminé avec le code : {}", s)),
-                                Err(e) => task.logs.push(format!("Erreur lors de l'attente du processus : {}", e)),
+                                Err(e) => task.logs.push(format!("Erreur : {}", e)),
                             }
                         }
                     }
@@ -140,11 +146,90 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
         });
     }
 
-    Html(r#"
-        <div id="download-status" hx-get="/download/logs" hx-trigger="load, every 1s" hx-target="this" hx-swap="outerHTML">
-            Initialisation...
+    // Retourne une carte par task avec log vide — SSE remplira les logs côté client
+    let cards: String = task_ids.iter().map(|&id| {
+        let (url_display, url_escaped) = {
+            let state = DOWNLOAD_STATE.lock().unwrap();
+            let url = state.tasks.iter().find(|t| t.id == id)
+                .map(|t| t.url.clone())
+                .unwrap_or_default();
+            let escaped = url.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+            let display = if escaped.len() > 80 { format!("{}...", &escaped[..80]) } else { escaped.clone() };
+            (display, escaped)
+        };
+        format!(r#"<div class="task-card" id="task-card-{id}" style="margin-bottom:1rem;border:1px solid #333;border-radius:4px;padding:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;">
+                <span id="task-badge-{id}" style="color:#4CAF50;font-family:monospace;font-size:0.8em;flex-shrink:0;">[EN COURS]</span>
+                <span style="font-family:monospace;font-size:0.8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="{url_escaped}">{url_display}</span>
+                <button id="task-stop-{id}" hx-post="/download/stop" hx-vals='{{"task_id":{id}}}' hx-swap="none" class="btn-shutdown" style="flex-shrink:0;font-size:0.8em;padding:3px 10px;background:#d9534f;">Stop</button>
+            </div>
+            <div id="task-log-{id}" style="background:#1a1a1a;color:#ccc;padding:8px;border-radius:4px;height:200px;overflow-y:auto;font-family:monospace;font-size:0.82em;white-space:pre-wrap;"></div>
         </div>
-    "#).into_response()
+        <script>initTaskSSE({id});</script>"#)
+    }).collect();
+
+    Html(format!(r#"<div id="download-tasks-container">{cards}
+        <button onclick="clearDoneTasks()" class="btn-primary" style="font-size:0.8em;padding:4px 12px;margin-top:4px;">Effacer terminés</button>
+    </div>"#)).into_response()
+}
+
+// SSE : pousse les lignes de log au fur et à mesure pour un task donné
+pub async fn task_log_sse(Path(task_id): Path<u32>) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Event>(256);
+
+    tokio::spawn(async move {
+        let mut offset = 0usize;
+        loop {
+            let (new_lines, is_done) = {
+                let state = DOWNLOAD_STATE.lock().unwrap();
+                match state.tasks.iter().find(|t| t.id == task_id) {
+                    Some(task) => {
+                        let start = offset.min(task.logs.len());
+                        let new: Vec<String> = task.logs[start..].to_vec();
+                        let done = !task.is_running;
+                        offset = start + new.len();
+                        (new, done)
+                    }
+                    None => (vec![], true),
+                }
+            };
+
+            for line in new_lines {
+                if tx.send(Event::default().event("log").data(line)).await.is_err() {
+                    return;
+                }
+            }
+
+            if is_done {
+                // Assure que toutes les lignes ont été envoyées avant de signaler la fin
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                let remaining = {
+                    let state = DOWNLOAD_STATE.lock().unwrap();
+                    state.tasks.iter().find(|t| t.id == task_id)
+                        .map(|t| t.logs[offset.min(t.logs.len())..].to_vec())
+                        .unwrap_or_default()
+                };
+                for line in remaining {
+                    if tx.send(Event::default().event("log").data(line)).await.is_err() {
+                        return;
+                    }
+                }
+                let exit_msg = {
+                    let state = DOWNLOAD_STATE.lock().unwrap();
+                    state.tasks.iter().find(|t| t.id == task_id)
+                        .map(|t| t.logs.last().cloned().unwrap_or_default())
+                        .unwrap_or_default()
+                };
+                let _ = tx.send(Event::default().event("done").data(exit_msg)).await;
+                return;
+            }
+
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    });
+
+    let stream = ReceiverStream::new(rx).map(Ok::<Event, Infallible>);
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 pub async fn stop_download_handler(headers: HeaderMap, Form(payload): Form<StopRequest>) -> impl IntoResponse {
@@ -156,7 +241,6 @@ pub async fn stop_download_handler(headers: HeaderMap, Form(payload): Form<StopR
     if let Some(task) = state.tasks.iter_mut().find(|t| t.id == payload.task_id) {
         if let Some(pid) = task.child_pid {
             let _ = Command::new("kill").arg(pid.to_string()).output();
-
             if let Some(target_dir) = &task.target_dir.clone() {
                 if let Ok(entries) = std::fs::read_dir(target_dir) {
                     for entry in entries.flatten() {
@@ -181,82 +265,19 @@ pub async fn clear_completed_handler(headers: HeaderMap) -> impl IntoResponse {
     if !check_auth(&headers) {
         return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
     }
-
     let mut state = DOWNLOAD_STATE.lock().unwrap();
     state.tasks.retain(|t| t.is_running);
-
     "".into_response()
 }
 
+// Endpoint legacy conservé pour compatibilité (non utilisé par le front SSE)
 pub async fn get_download_logs() -> impl IntoResponse {
     let state = DOWNLOAD_STATE.lock().unwrap();
-
-    if state.tasks.is_empty() {
-        return Html(r#"<div id="download-status" hx-get="/download/logs" hx-trigger="every 2s" hx-target="this" hx-swap="outerHTML">
-            <span style="color: var(--text-muted); font-family: monospace;">Aucun téléchargement...</span>
-        </div>"#.to_string()).into_response();
-    }
-
-    let has_running = state.tasks.iter().any(|t| t.is_running);
-    let has_completed = state.tasks.iter().any(|t| !t.is_running);
-
-    let tasks_html: String = state.tasks.iter().map(|task| {
-        let logs_html = task.logs.iter()
-            .map(|l| l.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"))
-            .collect::<Vec<_>>()
-            .join("<br>");
-
-        let url_display = {
-            let escaped = task.url.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
-            if escaped.len() > 80 {
-                format!("{}...", &escaped[..80])
-            } else {
-                escaped
-            }
-        };
-
-        let (status_color, status_label) = if task.is_running {
-            ("#4CAF50", "EN COURS")
-        } else {
-            ("#888888", "TERMINÉ")
-        };
-
-        let stop_button = if task.is_running {
-            format!(
-                r#"<button hx-post="/download/stop" hx-vals='{{"task_id": {}}}' hx-swap="none" class="btn-shutdown" style="font-size:0.8em;padding:3px 10px;background-color:#d9534f;">Stop</button>"#,
-                task.id
-            )
-        } else {
-            String::new()
-        };
-
-        format!(
-            r#"<div style="margin-bottom:1rem;border:1px solid #333;border-radius:4px;padding:8px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;">
-                    <span style="color:{};font-family:monospace;font-size:0.8em;flex-shrink:0;">[{}]</span>
-                    <span style="font-family:monospace;font-size:0.8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{}</span>
-                    {}
-                </div>
-                <div style="background:#1a1a1a;color:#ccc;padding:8px;border-radius:4px;max-height:180px;overflow-y:auto;font-family:monospace;font-size:0.82em;white-space:pre-wrap;">{}</div>
-            </div>"#,
-            status_color, status_label, url_display, stop_button,
-            if logs_html.is_empty() { "Initialisation...".to_string() } else { logs_html }
-        )
-    }).collect();
-
-    let clear_button = if has_completed {
-        r#"<button hx-post="/download/clear" hx-swap="none" class="btn-primary" style="font-size:0.8em;padding:3px 10px;margin-bottom:10px;">Effacer terminés</button>"#
-    } else {
-        ""
-    };
-
-    let trigger = if has_running { "every 1s" } else { "every 5s" };
-
+    let running_count = state.tasks.iter().filter(|t| t.is_running).count();
     Html(format!(
-        r#"<div id="download-status" hx-get="/download/logs" hx-trigger="{}" hx-target="this" hx-swap="outerHTML">
-            {}
-            {}
-        </div>"#,
-        trigger, clear_button, tasks_html
+        r#"<span style="font-family:monospace;color:var(--text-muted);">{} actif(s), {} terminé(s)</span>"#,
+        running_count,
+        state.tasks.iter().filter(|t| !t.is_running).count()
     )).into_response()
 }
+

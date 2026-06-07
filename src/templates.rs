@@ -27,6 +27,9 @@ pub struct DashboardTemplate {
     pub is_authenticated: bool,
     pub server_power: String,
     pub uptime_str: String,
+    pub path_video: String,
+    pub path_film: String,
+    pub path_download: String,
 }
 
 pub struct NetworkInfo {

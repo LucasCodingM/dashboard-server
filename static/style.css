@@ -788,3 +788,7 @@ input:checked + .slider:before { transform: translateX(22px); background-color: 
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-light); }
+
+/* ===================== File browser ===================== */
+.fb-item { transition: background 0.1s; color: var(--text-light); }
+.fb-item:hover { background: var(--bg-card) !important; }

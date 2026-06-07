@@ -10,7 +10,7 @@ use axum::{
 };
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
-use crate::{handlers::{authentification, download, system}, state::POWER_CONSUMPTION};
+use crate::{handlers::{authentification, browse, download, system}, state::POWER_CONSUMPTION};
 
 
 fn monitor_consumption() {
@@ -67,6 +67,8 @@ async fn main() {
         .route("/download/stop", post(download::stop_download_handler))
         .route("/download/clear", post(download::clear_completed_handler))
         .route("/download/logs", get(download::get_download_logs))
+        .route("/download/logs/{id}/stream", get(download::task_log_sse))
+        .route("/browse", get(browse::browse_handler))
         // Serves files from the "static" directory at the "/static" URL path
         .nest_service("/static", ServeDir::new("static"));
 

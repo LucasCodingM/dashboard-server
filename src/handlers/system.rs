@@ -117,6 +117,9 @@ pub async fn dashboard_handler(headers: HeaderMap) -> impl IntoResponse {
         is_authenticated,
         server_power,
         uptime_str,
+        path_video: std::env::var("VIDEO_PATH").unwrap_or_else(|_| "/stockage/videos".to_string()),
+        path_film: std::env::var("MOVIE_PATH").unwrap_or_else(|_| "/stockage/videos/films".to_string()),
+        path_download: std::env::var("DOWNLOAD_PATH").unwrap_or_else(|_| "/stockage/telechargements".to_string()),
     }
 }
 
