@@ -46,7 +46,10 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
         _ => download_path,
     };
 
-    let is_youtube = payload.url.contains("youtube.com") || payload.url.contains("youtu.be");
+    let use_ytdlp = payload.url.contains("youtube.com")
+        || payload.url.contains("youtu.be")
+        || payload.url.contains(".m3u8")
+        || payload.url.contains("m3u8");
 
         // Réinitialiser l'état
     {
@@ -59,7 +62,7 @@ pub async fn download_handler(headers: HeaderMap, Form(payload): Form<DownloadRe
     }
 
     std::thread::spawn(move || {
-        let mut cmd = if is_youtube {
+        let mut cmd = if use_ytdlp {
             let mut c = Command::new("yt-dlp");
             c.arg("--newline");
             c.arg("--no-colors");
